@@ -1,0 +1,6 @@
+Title: .object__title__display[]?
+Date: .object__date__edtf
+Bibliographic Citation: .object__bibliographic_citation__display[]?
+Creator: .object__creator[]?.agent__label__display[]
+Contributor: .object__contributor[]?.agent__label__display[]?
+Subject: .object__subject[]?.subject__label__display[]
