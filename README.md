@@ -52,7 +52,7 @@ source .venv/bin/activate
 ```
 
 ```zsh
-pip install -e .
+pip install -e . --group test
 ```
 
 Create a `.env` file with the following contents:
@@ -80,6 +80,18 @@ To listen on a different port, supply the `--port` option:
 
 ```zsh
 flask --app papaya.web run --port 3001
+```
+
+### Tests
+
+```zsh
+pytest
+```
+
+With coverage information:
+
+```zsh
+pytest --cov src --cov-report term-missing tests
 ```
 
 ## Name

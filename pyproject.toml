@@ -14,5 +14,14 @@ dependencies = [
     "waitress",
 ]
 
+[dependency-groups]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
 [project.scripts]
 papaya = "papaya.server:run"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
