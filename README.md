@@ -94,6 +94,32 @@ With coverage information:
 pytest --cov src --cov-report term-missing tests
 ```
 
+### Docker Image
+
+Build the image:
+
+```zsh
+docker build -t docker.lib.umd.edu/papaya .
+```
+
+When running in a Docker container, the `PAPAYA_SOLR_ENDPOINT` and
+`PAPAYA_IIIF_IMAGE_ENDPOINT` environment variables will need to be
+adjusted to refer to the correct hostname.
+
+Copy the `.env` file set up earlier to `docker.env`, and make these
+changes:
+
+```dotenv
+PAPAYA_SOLR_ENDPOINT=http://host.docker.internal:8985/solr/fcrepo
+PAPAYA_IIIF_IMAGE_ENDPOINT=http://host.docker.internal:8182/iiif/2
+```
+
+Run, using this new `docker.env` file:
+
+```zsh
+docker run --rm -it -p 3001:5000 --env-file docker.env docker.lib.umd.edu/papaya
+```
+
 ## Name
 
 This application is so-named because the phrase "Presentation API 
