@@ -69,6 +69,11 @@ class IdentifierProblem(ProblemDetailError, BadRequest):
     description = 'The identifier {iiif_id} is not recognized as a valid IIIF identifier'
 
 
+class ManifestNotAvailable(ProblemDetailError, NotFound):
+    name = 'Manifest not available'
+    description = 'No manifest is available for the resource with URI "{uri}"'
+
+
 class ManifestNotFound(ProblemDetailError, NotFound):
     name = 'Manifest not found'
     description = 'Manifest with identifier "{id}" not found'
@@ -94,6 +99,7 @@ class ServiceProblem(ProblemDetailError, InternalServerError):
     server or the Fedora repository).
 
     The HTTP status is `500 Internal Server Error`."""
+
     name = 'Backend service error'
     description = 'Backend service error'
 
@@ -102,5 +108,6 @@ class ConfigurationProblem(ProblemDetailError, InternalServerError):
     """The server is incorrectly configured.
 
     The HTTP status is `500 Internal Server Error`."""
+
     name = 'Configuration error'
     description = 'The server is incorrectly configured.'
