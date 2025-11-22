@@ -37,6 +37,7 @@ def create_app():
         solr_service=SolrService(
             endpoint=app.config['SOLR_ENDPOINT'],
             metadata_queries=app.config.get('METADATA_QUERIES', {}),
+            text_match_field=app.config['SOLR_TEXT_MATCH_FIELD'],
         ),
         repo_service=RepositoryService(
             endpoint=app.config['FCREPO_ENDPOINT'],
@@ -91,7 +92,7 @@ def create_app():
         """Implements the manifest response.
 
         See also: https://iiif.io/api/presentation/2.1/#manifest"""
-        return ctx.get_manifest(manifest_id, request.args.get('q', None)).to_dict(with_context=True)
+        return ctx.get_manifest(manifest_id, request.args.get('q', None)).json(with_context=True)
 
     @app.route('/manifests/<manifest_id>/sequence/<sequence_name>')
     def get_sequence(manifest_id: str, sequence_name: str):
@@ -100,7 +101,7 @@ def create_app():
         See also: https://iiif.io/api/presentation/2.1/#sequence"""
         try:
             manifest = ctx.get_manifest(manifest_id, request.args.get('q', None))
-            return manifest.find_sequence(sequence_name).to_dict(with_context=True)
+            return manifest.find_sequence(sequence_name).json(with_context=True)
         except KeyError as e:
             raise SequenceNotFound(sequence_name=sequence_name, manifest_id=manifest_id) from e
 
@@ -111,7 +112,7 @@ def create_app():
         See also: https://iiif.io/api/presentation/2.1/#canvas"""
         try:
             manifest = ctx.get_manifest(manifest_id, request.args.get('q', None))
-            return manifest.find_canvas(canvas_name).to_dict(with_context=True)
+            return manifest.find_canvas(canvas_name).json(with_context=True)
         except KeyError as e:
             raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
 
@@ -121,7 +122,7 @@ def create_app():
 
         See also: https://iiif.io/api/presentation/2.1/#image-resources"""
         try:
-            return ctx.get_manifest(manifest_id).find_annotation(annotation_name).to_dict(with_context=True)
+            return ctx.get_manifest(manifest_id).find_annotation(annotation_name).json(with_context=True)
         except KeyError as e:
             raise AnnotationNotFound(annotation_name=annotation_name, manifest_id=manifest_id) from e
 
@@ -132,7 +133,7 @@ def create_app():
         except KeyError as e:
             raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
 
-        return SearchHitsList(canvas, request.args.get('q')).to_dict(with_context=True)
+        return SearchHitsList(canvas, request.args.get('q')).json(with_context=True)
 
     app.register_error_handler(ProblemDetailError, problem_detail_response)
 

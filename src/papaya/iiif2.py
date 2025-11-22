@@ -46,22 +46,30 @@ class ImageParams(NamedTuple):
 
 
 class ImageInfo(NamedTuple):
+    """Image information from the IIIF Image API service"""
     uri: str
+    """Image URI"""
     context: str | dict
+    """JSON-LD context"""
     profile: str | dict
+    """IIIF Image API profile"""
     width: int
+    """Image width"""
     height: int
+    """Image height"""
 
     @property
     def aspect_ratio(self) -> Fraction:
+        """Image aspect ratio (`width / height`)"""
         return Fraction(self.width, self.height)
 
 
 class ImageServiceError(Exception):
-    pass
+    """There was a problem communicating with the IIIF Image API server"""
 
 
 class ImageService:
+    """IIIF Image API service endpoint."""
     def __init__(self, endpoint: str, thumbnail_width: int = 250):
         self.endpoint = endpoint
         self.thumbnail_width = thumbnail_width
@@ -89,10 +97,11 @@ FULL_IMAGE_PARAMS = ImageParams('full', 'full', '0', 'default', 'jpg')
 
 
 class Manifest:
+    """IIIF Manifest"""
     def __init__(self, ctx: PresentationContext, id: str, text_query: str = None):
-        self.ctx = ctx
-        self.id = id
-        self.text_query = text_query
+        self.ctx: PresentationContext = ctx
+        self.id: str = id
+        self.text_query: str = text_query
 
     @property
     def base_uri(self) -> str:
@@ -100,7 +109,10 @@ class Manifest:
 
     @property
     def uri(self) -> str:
-        return f'{self.base_uri}/{self.id}/manifest'
+        uri = f'{self.base_uri}/{self.id}/manifest'
+        if self.text_query is not None:
+            uri += '?' + urlencode({'q': self.text_query})
+        return uri
 
     @cached_property
     def resource(self) -> Resource:
@@ -125,7 +137,7 @@ class Manifest:
         else:
             raise KeyError(name)
 
-    def find_annotation(self, name: str) -> Annotation:
+    def find_annotation(self, name: str) -> ImageAnnotation:
         for sequence in self.sequences:
             for canvas in sequence.canvases:
                 if canvas.image_annotation.name == name:
@@ -133,13 +145,13 @@ class Manifest:
         else:
             raise KeyError(name)
 
-    def to_dict(self, with_context: bool = False) -> dict[str, Any]:
+    def json(self, with_context: bool = False) -> dict[str, Any]:
         manifest_info: dict[str, Any] = {
             '@id': self.uri,
             '@type': 'sc:Manifest',
-            'label': self.resource.title[0],
+            'label': self.resource.label,
             'metadata': self.resource.metadata,
-            'sequences': [seq.to_dict() for seq in self.sequences],
+            'sequences': [seq.json() for seq in self.sequences],
             'navDate': self.resource.date,
             'license': self.resource.license,
         }
@@ -158,11 +170,12 @@ class Manifest:
 
 
 class Sequence:
+    """IIIF Sequence"""
     def __init__(self, manifest: Manifest, name: str):
-        self.manifest = manifest
-        self.ctx = self.manifest.ctx
-        self.name = name
-        self.resource = self.manifest.resource
+        self.manifest: Manifest = manifest
+        self.name: str = name
+        self.ctx: PresentationContext = self.manifest.ctx
+        self.resource: Resource = self.manifest.resource
 
     @property
     def uri(self) -> str:
@@ -182,11 +195,11 @@ class Sequence:
         else:
             raise KeyError(name)
 
-    def to_dict(self, with_context: bool = False) -> dict[str, Any]:
+    def json(self, with_context: bool = False) -> dict[str, Any]:
         sequence_info = {
             '@id': self.uri,
             '@type': 'sc:Sequence',
-            'canvases': [canvas.to_dict() for canvas in self.canvases],
+            'canvases': [canvas.json() for canvas in self.canvases],
         }
         if len(self.canvases) > 0:
             sequence_info['startCanvas'] = self.canvases[0].uri
@@ -198,6 +211,7 @@ class Sequence:
 
 
 class Canvas:
+    """IIIF Canvas"""
     def __init__(self, sequence: Sequence, name: str, page_uri: str):
         self.sequence = sequence
         self.name = name
@@ -211,30 +225,33 @@ class Canvas:
         return f'{self.manifest.base_uri}/{self.manifest.id}/canvas/{self.name}'
 
     @cached_property
-    def image_annotation(self) -> Annotation:
-        return Annotation(
+    def image_annotation(self) -> ImageAnnotation:
+        return ImageAnnotation(
             canvas=self,
             name=f'{self.name}-image',
-            motivation='sc:painting',
-            resource=Image(
+            image=Image(
                 service=self.manifest.ctx.image_service,
                 image_id=self.image_id,
                 iiif_params=FULL_IMAGE_PARAMS,
             ),
         )
 
+    @cached_property
+    def thumbnail(self) -> ThumbnailImage:
+        return ThumbnailImage(self.manifest.ctx.image_service, self.image_id)
+
     def search_text(self, query: str) -> list[TaggedText]:
         resource_uri = self.manifest.resource.uri
         page_index = int(self.name)
         return self.manifest.ctx.solr_service.get_text_matches(resource_uri, query, page_index)
 
-    def to_dict(self, with_context: bool = False) -> dict[str, Any]:
+    def json(self, with_context: bool = False) -> dict[str, Any]:
         canvas_info = {
             '@id': self.uri,
             '@type': 'sc:Canvas',
-            'label': self.resource.get_page_title(self.page_uri),
-            'images': [self.image_annotation.to_dict()],
-            'thumbnail': self.image_annotation.thumbnail_dict(),
+            'label': self.resource.get_page_label(self.page_uri),
+            'images': [self.image_annotation.json()],
+            'thumbnail': self.thumbnail.json(),
             'height': self.image_annotation.height,
             'width': self.image_annotation.width,
             'otherContent': [],
@@ -254,13 +271,14 @@ class Canvas:
         return canvas_info
 
 
-class Annotation:
-    def __init__(self, canvas: Canvas, name: str, motivation: str, resource: Image):
+class ImageAnnotation:
+    """IIIF Image Annotation"""
+    def __init__(self, canvas: Canvas, name: str, image: Image, motivation: str = 'sc:painting'):
         self.canvas = canvas
         self.manifest = self.canvas.manifest
         self.name = name
         self.motivation = motivation
-        self.resource = resource
+        self.image = image
 
     @property
     def uri(self) -> str:
@@ -268,21 +286,21 @@ class Annotation:
 
     @property
     def width(self) -> int:
-        return self.resource.info.width
+        return self.image.info.width
 
     @property
     def height(self) -> int:
-        return self.resource.info.height
+        return self.image.info.height
 
     def thumbnail_dict(self) -> dict[str, Any]:
-        return self.resource.thumbnail_dict()
+        return self.image.thumbnail_dict()
 
-    def to_dict(self, with_context: bool = False) -> dict[str, Any]:
+    def json(self, with_context: bool = False) -> dict[str, Any]:
         annotation_info = {
             '@id': self.uri,
             '@type': 'oa:Annotation',
             'motivation': self.motivation,
-            'resource': self.resource.to_dict(),
+            'resource': self.image.json(),
             'on': self.canvas.uri,
         }
 
@@ -293,6 +311,7 @@ class Annotation:
 
 
 class Image:
+    """IIIF Image"""
     def __init__(self, service: ImageService, image_id: str, iiif_params: ImageParams = None):
         self.service = service
         self.image_id = image_id
@@ -313,7 +332,7 @@ class Image:
         width = self.service.thumbnail_width
         height = int(width / self.info.aspect_ratio)
         thumbnail_params = ImageParams(size=f'{width},{height}')
-        image = self.to_dict()
+        image = self.json()
         image.update(
             {
                 '@id': self.info.uri + str(thumbnail_params),
@@ -323,7 +342,7 @@ class Image:
         )
         return image
 
-    def to_dict(self) -> dict[str, Any]:
+    def json(self) -> dict[str, Any]:
         return {
             '@id': self.uri,
             '@type': 'dctypes:Image',
@@ -338,7 +357,23 @@ class Image:
         }
 
 
+class ThumbnailImage(Image):
+    """IIIF thumbnail image"""
+    def __init__(self, service: ImageService, image_id: str):
+        super().__init__(service, image_id)
+        self.width = self.service.thumbnail_width
+        self.height = int(self.width / self.info.aspect_ratio)
+        self.iiif_params = ImageParams(size=f'{self.width},{self.height}')
+
+    def json(self):
+        image = super().json()
+        image['width'] = self.width
+        image['height'] = self.height
+        return image
+
+
 class SearchHitsList:
+    """IIIF Annotation List of full text search hits"""
     def __init__(self, canvas: Canvas, query: str):
         self.canvas = canvas
         self.manifest = self.canvas.manifest
@@ -355,38 +390,50 @@ class SearchHitsList:
 
     @cached_property
     def annotations(self):
-        return [hit_annotation(f'#result-{i:03d}', self.canvas.uri, hit) for i, hit in enumerate(self.search_hits, 1)]
+        return [SearchResult(self.canvas, f'{self.uri}#result-{i:03d}', hit) for i, hit in enumerate(self.search_hits, 1)]
 
-    def to_dict(self, with_context: bool = False) -> dict[str, Any]:
-        list_info = {'@id': self.uri, '@type': 'sc:AnnotationList', 'resources': self.annotations}
+    def json(self, with_context: bool = False) -> dict[str, Any]:
+        list_info = {
+            '@id': self.uri,
+            '@type': 'sc:AnnotationList',
+            'resources': [annotation.json() for annotation in self.annotations],
+        }
 
         if with_context:
             list_info.update({'@context': PRESENTATION_API_CONTEXT})
 
         return list_info
 
+class SearchResult:
+    """IIIF Annotation of a single search result"""
+    def __init__(self, canvas: Canvas, uri: str, hit: TaggedText):
+        self.canvas = canvas
+        self.uri = uri
+        self.hit = hit
 
-def hit_annotation(uri, canvas_uri, hit: TaggedText):
-    return {
-        '@id': uri,
-        '@type': [
-            'oa:Annotation',
-            'umd:searchResult',
-        ],
-        'motivation': 'oa:highlighting',
-        'on': {
-            '@type': 'oa:SpecificResource',
-            'full': canvas_uri,
-            'selector': {
-                '@type': 'oa:FragmentSelector',
-                'value': f'xywh={hit.params["xywh"]}',
+    def json(self) -> dict[str, Any]:
+        return {
+            '@id': self.uri,
+            '@type': [
+                'oa:Annotation',
+                'umd:searchResult',
+            ],
+            'motivation': 'oa:highlighting',
+            'on': {
+                '@type': 'oa:SpecificResource',
+                'full': self.canvas.uri,
+                'selector': {
+                    '@type': 'oa:FragmentSelector',
+                    'value': f'xywh={self.hit.params["xywh"]}',
+                },
             },
-        },
-    }
+        }
 
 
 @dataclass
 class PresentationContext:
+    """Configured service information for retrieving Solr documents
+    and images, and generating manifests."""
     solr_service: SolrService
     repo_service: RepositoryService
     image_service: ImageService
