@@ -1,6 +1,9 @@
 import logging
 import re
 from collections.abc import Iterable, Mapping
+from typing import NamedTuple
+from urllib.parse import parse_qsl
+from uuid import uuid4
 
 import jq
 import pysolr
@@ -65,7 +68,6 @@ class PreservationFileError(Exception):
     pass
 
 
-
 class Resource:
     """A digital object that has a IIIF manifest."""
 
@@ -99,9 +101,7 @@ class Resource:
 
     @property
     def metadata(self) -> list[dict]:
-        metadata = [
-            {'label': k, 'value': self.get_metadata_values(k)} for k in self.metadata_queries.keys()
-        ]
+        metadata = [{'label': k, 'value': self.get_metadata_values(k)} for k in self.metadata_queries.keys()]
         return [m for m in metadata if m['value']]
 
     def get_metadata_values(self, key: str):
@@ -138,7 +138,6 @@ class SolrService:
         self.solr = pysolr.Solr(self.endpoint)
         self.metadata_queries = metadata_queries
 
-    # @cached(TTLCache(maxsize=32, ttl=60), info=True)
     def get_doc(self, resource_uri: str) -> dict:
         try:
             # use the term query parser and pass the URI as a regular query parameter
@@ -156,3 +155,48 @@ class SolrService:
 
     def get_resource(self, resource_uri: str) -> Resource:
         return Resource(self.get_doc(resource_uri), self.metadata_queries)
+
+    def get_text_matches(self, resource_uri: str, text_query: str, index: int = None):
+        text_match_field = 'extracted_text__dps_txt'
+        # use a unique match tag to mark the parts of the snippets
+        # we want to extract into annotations
+        match_tag = f'<<{uuid4()}>>'
+        try:
+            results = self.solr.search(
+                q='{!term f=id v=$id}',
+                id=resource_uri,
+                hl='on',
+                **{
+                    'hl.fl': text_match_field,
+                    'hl.q': f'{text_match_field}:{text_query}',
+                    'hl.snippets': 100,
+                    'hl.fragsize': 50,
+                    'hl.maxAnalyzedChars': 1_000_000,
+                    'hl.tag.pre': match_tag,
+                    'hl.tag.post': match_tag,
+                },
+            )
+        except pysolr.SolrError as e:
+            raise SolrLookupError(str(e)) from e
+
+        hits = []
+        for text in results.highlighting[resource_uri].get(text_match_field, []):
+            hits.extend(TaggedText.parse(x) for i, x in enumerate(text.split(match_tag)) if i % 2 == 1)
+
+        if index is not None:
+            return [h for h in hits if int(h.params['n']) == index]
+        else:
+            return hits
+
+
+class TaggedText(NamedTuple):
+    text: str
+    params: dict
+
+    @classmethod
+    def parse(cls, dps_string: str):
+        text, tag = dps_string.split('|', 1)
+        return cls(
+            text=text,
+            params=dict(parse_qsl(tag)),
+        )

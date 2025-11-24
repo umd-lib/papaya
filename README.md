@@ -6,6 +6,7 @@ IIIF Presentation API Application
 
 ### Environment Variables
 
+* **`PAPAYA_URL`** Public facing base URL of this application.
 * **`PAPAYA_FCREPO_ENDPOINT`** URL of the Fedora repository. This is not 
   directly accessed, but is used when translating between URIs and IIIF 
   identifiers.
@@ -59,6 +60,7 @@ Create a `.env` file with the following contents:
 
 ```dotenv
 FLASK_DEBUG=1
+PAPAYA_URL=http://localhost:3001/manifests
 PAPAYA_FCREPO_ENDPOINT=http://fcrepo-local:8080/fcrepo/rest
 PAPAYA_FCREPO_PREFIX=fcrepo:
 PAPAYA_SOLR_ENDPOINT=http://localhost:8985/solr/fcrepo
