@@ -1,0 +1,17 @@
+Title: .object__title__display[]?
+Date: .object__date__edtf
+Bibliographic Citation: .object__bibliographic_citation__display[]?
+Creator: .object__creator[]?.agent__label__display[]?
+Contributor: .object__contributor[]?.agent__label__display[]?
+Subject: .object__subject[]?.subject__label__display[]?
+# structural metadata fields
+# used by Papaya to generate canvases, sequences, etc.
+$uri: .id
+$label: .object__title__display[]?
+$date: .object__date__dt?
+$license_uri: .object__rights__same_as__uris[0]
+$page_uris: .page_uri_sequence__uris[]?
+$page_image_ids: .iiif_thumbnail_sequence__ids[]?
+$*page_doc: .object__has_member[]|select(.id == $uri)
+$*page_label: .object__has_member[]|select(.id == $uri).page__title__txt
+$*file_page_uri: .object__has_member[]|select(.page__has_file[].id == $uri).id

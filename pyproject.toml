@@ -20,6 +20,9 @@ test = [
     "pytest-cov",
     "ruff",
 ]
+docs = [
+    "pdoc",
+]
 
 [project.scripts]
 papaya = "papaya.server:run"
