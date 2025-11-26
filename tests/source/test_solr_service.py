@@ -14,6 +14,7 @@ def mock_solr():
         mock_solr = MagicMock()
         mock_solr.search.return_value = mock_results
         return mock_solr
+
     return _mock_solr
 
 

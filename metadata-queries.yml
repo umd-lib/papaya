@@ -9,6 +9,7 @@ Subject: .object__subject[]?.subject__label__display[]?
 $uri: .id
 $label: .object__title__display[]?
 $date: .object__date__dt?
+$description: .object__description__display[]?
 $license_uri: .object__rights__same_as__uris[0]
 $page_uris: .page_uri_sequence__uris[]?
 $page_image_ids: .iiif_thumbnail_sequence__ids[]?

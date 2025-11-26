@@ -35,10 +35,13 @@ def test_license(resource):
 def test_metadata(resource):
     assert resource.metadata == [
         {'label': 'Title', 'value': ['Foobar']},
-        {'label': 'Creator', 'value': [
-            'John Doe',
-            {'@language': 'de', '@value': 'Johannes Tier'},
-        ]},
+        {
+            'label': 'Creator',
+            'value': [
+                'John Doe',
+                {'@language': 'de', '@value': 'Johannes Tier'},
+            ],
+        },
     ]
 
 
@@ -52,7 +55,7 @@ def test_find_page_doc(resource):
 
 
 def test_get_page_index(resource):
-    assert resource.get_page_index('http://example.com/fcrepo/123/p/3') == 2
+    assert resource.index('http://example.com/fcrepo/123/p/3') == 2
 
 
 def test_get_page_image_id(resource):

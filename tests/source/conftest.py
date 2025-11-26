@@ -33,7 +33,7 @@ def solr_doc():
         'creator': [
             {'name': 'John Doe'},
             {'name': '[@de]Johannes Tier'},
-        ]
+        ],
     }
 
 
@@ -48,7 +48,7 @@ def metadata_queries():
         '$page_image_ids': '.images__ids[]',
         '$*page_doc': '.pages[]|select(.id == $uri)',
         '$*page_label': '.pages[]|select(.id == $uri).title',
-        '$*file_page_uri':'.pages[]|select(.files[].id == $uri).id',
+        '$*file_page_uri': '.pages[]|select(.files[].id == $uri).id',
         'Title': '.title__txt',
-        'Creator': '.creator[]?.name'
+        'Creator': '.creator[]?.name',
     }
