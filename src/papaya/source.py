@@ -5,9 +5,14 @@ Metadata queries whose keys begin with `$` are used to define the
 structure and basic manifest metadata:
 
 * **`$uri`** Returns the resource URI
-* **`$label`** Returns the value to use as the manifest `label`
+* **`$label`** Returns the value to use as the manifest `label`. If there
+  are multiple values (e.g., multiple languages), concatenates them using
+  the string `' / '`
 * **`$date`** Returns the value to use as the manifest `navDate`
 * **`$license_uri`** Returns URI to use as the manifest `license`
+* **`$description`** Returns the value to use as the manifest `description`
+  If there are multiple values (e.g., multiple languages), concatenates
+  them using the string `' / '`
 * **`$page_uris`** Returns a list of page URIs in page order
 * **`$page_image_ids`** Returns a list of IIIF Image IDs for the pages,
   in the same order as the `$page_uris`
@@ -61,6 +66,7 @@ Would yield this metadata mapping in the output manifest:
 }
 ```
 """
+
 import logging
 import re
 from collections.abc import Mapping
@@ -100,6 +106,7 @@ class RepositoryService:
 
     ```
     """
+
     def __init__(self, endpoint: str, prefix: str, path_sep: str = ':'):
         self.endpoint = endpoint
         """Base URL of the source repository."""
@@ -118,7 +125,7 @@ class RepositoryService:
         if not iiif_id.startswith(self.prefix):
             logger.error(f'Invalid IIIF ID: Expecting "{self.prefix}<local part>", got "{iiif_id}"')
             raise IdentifierError(iiif_id)
-        local_part = iiif_id[len(self.prefix):]
+        local_part = iiif_id.removeprefix(self.prefix)
         repo_path = '/' + local_part.replace(self.path_sep, '/')
         return self.endpoint + repo_path
 
@@ -152,7 +159,9 @@ class Resource:
         the metadata and structure of the IIIF manifest. See
         [Metadata Queries](#metadata-queries) for more details and a list of
         expected keys."""
-        self._jq_programs: dict[str, _Program] = {k: jq.compile(v) for k, v in self.metadata_queries.items() if not k.startswith('$*')}
+        self._jq_programs: dict[str, _Program] = {
+            k: jq.compile(v) for k, v in self.metadata_queries.items() if not k.startswith('$*')
+        }
 
     def _query(self, key: str) -> _ProgramWithInput:
         return self._jq_programs[key].input_value(self.doc)
@@ -190,6 +199,14 @@ class Resource:
         return self._query('$license_uri').first()
 
     @property
+    def description(self) -> str:
+        """Description for the manifest. Metadata query key: `$description`
+
+        The query may return multiple values. All values are concatenated
+        using the string `' / '`."""
+        return ' / '.join(self._query('$description'))
+
+    @property
     def metadata(self) -> list[dict]:
         """Descriptive metadata for the manifest.
 
@@ -198,8 +215,13 @@ class Resource:
         the field, and the returned value or values from the query are processed
         by `format_language_tag` and become the value of the field."""
         keys = [k for k in self.metadata_queries.keys() if not k.startswith('$')]
-        metadata = [{'label': k, 'value': [format_value(v) for v in self._query(k)]} for k in keys]
+        metadata = [{'label': k, 'value': [format_value(v) for v in self._query(k) if v is not None]} for k in keys]
         return [m for m in metadata if m['value']]
+
+    def index(self, page_uri: str) -> int:
+        """Given a page URI, return the (0-based) index of that page in the
+        sequential list of `page_uris`"""
+        return self.page_uris.index(page_uri)
 
     def get_page_doc(self, page_uri: str) -> dict:
         """Given a page URI, returns the mapping of metadata of that single page.
@@ -215,15 +237,11 @@ class Resource:
         program: _Program = jq.compile(self.metadata_queries['$*file_page_uri'], args={'uri': file_uri})
         return program.input_value(self.doc).first()
 
-    def get_page_index(self, page_uri: str) -> int:
-        """Given a page URI, return the (0-based) index of that page in the
-        sequential list of `page_uris`."""
-        return self.page_uris.index(page_uri)
-
     def get_page_image_id(self, page_uri: str) -> str:
         """Given a page URI, returns the IIIF ID of the image that should be
-        displayed on that page. Metadata query key: `$page_image_ids`."""
-        return self._query('$page_image_ids').all()[self.get_page_index(page_uri)]
+        displayed on that page. Metadata query key: `$page_image_ids`. The
+        given `page_uri` is passed to the query as the `$uri` argument."""
+        return self._query('$page_image_ids').all()[self.index(page_uri)]
 
     def get_page_label(self, page_uri: str) -> str:
         """Given a page URI, returns the value to use as the label for that page.
@@ -244,7 +262,10 @@ class SolrDocumentNotFound(SolrLookupError):
 class SolrService:
     """Service for querying a Solr server to retrieve digital object metadata
     to use to build the IIIF manifest."""
-    def __init__(self, endpoint: str, metadata_queries: Mapping[str, str], text_match_field: str, uri_field: str = 'id'):
+
+    def __init__(
+        self, endpoint: str, metadata_queries: Mapping[str, str], text_match_field: str, uri_field: str = 'id'
+    ):
         self.endpoint = endpoint
         """URL of the Solr core to use. Must have a '/select' query handler."""
         self.metadata_queries = metadata_queries

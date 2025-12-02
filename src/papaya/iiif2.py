@@ -47,6 +47,7 @@ class ImageParams(NamedTuple):
 
 class ImageInfo(NamedTuple):
     """Image information from the IIIF Image API service"""
+
     uri: str
     """Image URI"""
     context: str | dict
@@ -70,6 +71,7 @@ class ImageServiceError(Exception):
 
 class ImageService:
     """IIIF Image API service endpoint."""
+
     def __init__(self, endpoint: str, thumbnail_width: int = 250):
         self.endpoint = endpoint
         self.thumbnail_width = thumbnail_width
@@ -98,6 +100,7 @@ FULL_IMAGE_PARAMS = ImageParams('full', 'full', '0', 'default', 'jpg')
 
 class Manifest:
     """IIIF Manifest"""
+
     def __init__(self, ctx: PresentationContext, id: str, text_query: str = None):
         self.ctx: PresentationContext = ctx
         self.id: str = id
@@ -151,12 +154,13 @@ class Manifest:
             '@type': 'sc:Manifest',
             'label': self.resource.label,
             'metadata': self.resource.metadata,
+            'description': self.resource.description,
             'sequences': [seq.json() for seq in self.sequences],
             'navDate': self.resource.date,
             'license': self.resource.license,
         }
         try:
-            manifest_info['thumbnail'] = self.sequences[0].canvases[0].image_annotation.thumbnail_dict()
+            manifest_info['thumbnail'] = self.sequences[0].canvases[0].thumbnail.json()
         except IndexError:
             pass
 
@@ -171,6 +175,7 @@ class Manifest:
 
 class Sequence:
     """IIIF Sequence"""
+
     def __init__(self, manifest: Manifest, name: str):
         self.manifest: Manifest = manifest
         self.name: str = name
@@ -212,6 +217,7 @@ class Sequence:
 
 class Canvas:
     """IIIF Canvas"""
+
     def __init__(self, sequence: Sequence, name: str, page_uri: str):
         self.sequence = sequence
         self.name = name
@@ -273,6 +279,7 @@ class Canvas:
 
 class ImageAnnotation:
     """IIIF Image Annotation"""
+
     def __init__(self, canvas: Canvas, name: str, image: Image, motivation: str = 'sc:painting'):
         self.canvas = canvas
         self.manifest = self.canvas.manifest
@@ -292,9 +299,6 @@ class ImageAnnotation:
     def height(self) -> int:
         return self.image.info.height
 
-    def thumbnail_dict(self) -> dict[str, Any]:
-        return self.image.thumbnail_dict()
-
     def json(self, with_context: bool = False) -> dict[str, Any]:
         annotation_info = {
             '@id': self.uri,
@@ -312,6 +316,7 @@ class ImageAnnotation:
 
 class Image:
     """IIIF Image"""
+
     def __init__(self, service: ImageService, image_id: str, iiif_params: ImageParams = None):
         self.service = service
         self.image_id = image_id
@@ -327,20 +332,6 @@ class Image:
     @cached_property
     def info(self) -> ImageInfo:
         return self.service.get_metadata(self.image_id)
-
-    def thumbnail_dict(self) -> dict[str, Any]:
-        width = self.service.thumbnail_width
-        height = int(width / self.info.aspect_ratio)
-        thumbnail_params = ImageParams(size=f'{width},{height}')
-        image = self.json()
-        image.update(
-            {
-                '@id': self.info.uri + str(thumbnail_params),
-                'height': height,
-                'width': width,
-            }
-        )
-        return image
 
     def json(self) -> dict[str, Any]:
         return {
@@ -359,13 +350,14 @@ class Image:
 
 class ThumbnailImage(Image):
     """IIIF thumbnail image"""
+
     def __init__(self, service: ImageService, image_id: str):
         super().__init__(service, image_id)
         self.width = self.service.thumbnail_width
         self.height = int(self.width / self.info.aspect_ratio)
         self.iiif_params = ImageParams(size=f'{self.width},{self.height}')
 
-    def json(self):
+    def json(self) -> dict[str, Any]:
         image = super().json()
         image['width'] = self.width
         image['height'] = self.height
@@ -374,6 +366,7 @@ class ThumbnailImage(Image):
 
 class SearchHitsList:
     """IIIF Annotation List of full text search hits"""
+
     def __init__(self, canvas: Canvas, query: str):
         self.canvas = canvas
         self.manifest = self.canvas.manifest
@@ -385,12 +378,14 @@ class SearchHitsList:
         return f'{self.manifest.base_uri}/{self.manifest.id}/list/{self.canvas.name}-search?{query_string}'
 
     @cached_property
-    def search_hits(self):
+    def search_hits(self) -> list[TaggedText]:
         return self.canvas.search_text(self.query)
 
     @cached_property
-    def annotations(self):
-        return [SearchResult(self.canvas, f'{self.uri}#result-{i:03d}', hit) for i, hit in enumerate(self.search_hits, 1)]
+    def annotations(self) -> list[SearchResult]:
+        return [
+            SearchResult(self.canvas, f'{self.uri}#result-{i:03d}', hit) for i, hit in enumerate(self.search_hits, 1)
+        ]
 
     def json(self, with_context: bool = False) -> dict[str, Any]:
         list_info = {
@@ -404,8 +399,10 @@ class SearchHitsList:
 
         return list_info
 
+
 class SearchResult:
     """IIIF Annotation of a single search result"""
+
     def __init__(self, canvas: Canvas, uri: str, hit: TaggedText):
         self.canvas = canvas
         self.uri = uri
@@ -434,6 +431,7 @@ class SearchResult:
 class PresentationContext:
     """Configured service information for retrieving Solr documents
     and images, and generating manifests."""
+
     solr_service: SolrService
     repo_service: RepositoryService
     image_service: ImageService
@@ -452,7 +450,7 @@ class PresentationContext:
         except URLError as e:
             raise ManifestNotAvailable(uri=resource_uri) from e
 
-    def get_resource(self, manifest_id: str):
+    def get_resource(self, manifest_id: str) -> Resource:
         try:
             return self.solr_service.get_resource(self.get_resource_uri(manifest_id))
         except SolrDocumentNotFound as e:
@@ -460,5 +458,5 @@ class PresentationContext:
         except SolrLookupError as e:
             raise ServiceProblem from e
 
-    def get_manifest(self, manifest_id: str, text_query: str = None):
+    def get_manifest(self, manifest_id: str, text_query: str = None) -> Manifest:
         return Manifest(ctx=self, id=manifest_id, text_query=text_query)

@@ -51,8 +51,12 @@ def create_app():
         logo_url=app.config.get('LOGO_URL', None),
     )
 
-    @app.route('/', methods=['GET'])
+    @app.route('/')
     def root():
+        return redirect(url_for('manifests_form'), HTTPStatus.FOUND)
+
+    @app.route('/manifests/', methods=['GET'])
+    def manifests_form():
         """Provides a basic form to generate a IIIF manifest from a resource URL."""
         return f"""
         <html>
@@ -72,7 +76,7 @@ def create_app():
         </html>
         """
 
-    @app.route('/', methods=['POST'])
+    @app.route('/manifests/', methods=['POST'])
     def find_manifest():
         """Redirects to the actual manifest URL using the resource URL submitted
         via the form."""
@@ -85,7 +89,7 @@ def create_app():
     @app.route('/manifests/<manifest_id>/manifest.json')
     def redirect_to_manifest(manifest_id: str):
         """Redirects requests for the manifest to its canonical URL."""
-        return redirect(url_for('get_manifest', manifest_id=manifest_id, _external=True), HTTPStatus.MOVED_PERMANENTLY)
+        return redirect(url_for('get_manifest', manifest_id=manifest_id), HTTPStatus.MOVED_PERMANENTLY)
 
     @app.route('/manifests/<manifest_id>/manifest')
     def get_manifest(manifest_id: str):
