@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from http import HTTPStatus
 from urllib.parse import urlencode
 
@@ -23,6 +24,28 @@ logging.basicConfig(
     format='%(levelname)s:%(threadName)s:%(name)s:%(message)s',
 )
 logger = logging.getLogger(__name__)
+
+
+def expand_shortened_path(path: str) -> str:
+    """Expand a `path` string containing a shortened IIIF ID. If there is no shortened
+    IIIF ID in `path`, returns the original string.
+
+    ```pycon
+    >>> expand_shortened_path('/manifests/fcrepo:dc:2021:2::d48c8493-c226-4f17-9990-52bd552c2cc6')
+    '/manifests/fcrepo:dc:2021:2:d4:8c:84:93:d48c8493-c226-4f17-9990-52bd552c2cc6'
+
+    # not shortened
+    >>> expand_shortened_path('/manifests/fcrepo:dc:2021:2:d4:8c:84:93:d48c8493-c226-4f17-9990-52bd552c2cc6')
+    '/manifests/fcrepo:dc:2021:2:d4:8c:84:93:d48c8493-c226-4f17-9990-52bd552c2cc6'
+
+    ```
+    """
+    if not (m := re.search(r'::([0-9a-f]{8})', path)):
+        return path
+    uuid_segment = m[1]
+    pairtree = ':'.join(uuid_segment[n:n + 2] for n in range(0, 8, 2))
+    # insert the pairtree
+    return path[:m.span()[0]] + f':{pairtree}:{m[1]}' + path[m.span()[1]:]
 
 
 def create_app():
@@ -50,6 +73,12 @@ def create_app():
         endpoint_url=app.config['URL'],
         logo_url=app.config.get('LOGO_URL', None),
     )
+
+    @app.before_request
+    def rewrite_short_ids():
+        """Rewrite abbreviated IIIF IDs to their full form."""
+        new_path = expand_shortened_path(request.path)
+        return redirect(new_path, code=HTTPStatus.PERMANENT_REDIRECT) if new_path != request.path else None
 
     @app.route('/')
     def root():
