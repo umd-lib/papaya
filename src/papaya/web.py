@@ -68,6 +68,7 @@ def create_app():
         ),
         image_service=ImageService(
             endpoint=app.config['IIIF_IMAGE_ENDPOINT'],
+            origin=app.config.get('IIIF_IMAGE_ORIGIN', None),
             thumbnail_width=app.config.get('THUMBNAIL_WIDTH', DEFAULT_THUMBNAIL_WIDTH),
         ),
         endpoint_url=app.config['URL'],

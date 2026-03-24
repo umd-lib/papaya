@@ -6,6 +6,7 @@ from typing import NamedTuple, Any
 from urllib.parse import urlencode
 
 import requests
+from urlobject import URLObject
 
 from papaya.errors import IdentifierProblem, ManifestNotFound, ServiceProblem, ManifestNotAvailable
 from papaya.source import (
@@ -69,17 +70,54 @@ class ImageServiceError(Exception):
     """There was a problem communicating with the IIIF Image API server"""
 
 
+@dataclass
+class ImageResource:
+    endpoint: URLObject
+    image_id: str
+    origin: URLObject = None
+
+    @property
+    def request_url(self) -> str:
+        if self.origin:
+            return f'{self.origin}/{self.image_id}'
+        else:
+            return f'{self.endpoint}/{self.image_id}'
+
+    @property
+    def info_url(self):
+        return f'{self.request_url}/info.json'
+
+    @property
+    def image_uri(self) -> str:
+        return f'{self.endpoint}/{self.image_id}'
+
+    @property
+    def forwarding_headers(self) -> dict[str, str]:
+        if self.origin is None:
+            return {}
+
+        forwarding_headers = {
+            'X-Forwarded-Proto': self.endpoint.scheme,
+            'X-Forwarded-Host': self.endpoint.hostname,
+        }
+        if self.endpoint.path != self.origin.path:
+            forwarding_headers['X-Forwarded-Path'] = str(self.endpoint.path).removesuffix(self.origin.path)
+
+        return forwarding_headers
+
+
 class ImageService:
     """IIIF Image API service endpoint."""
 
-    def __init__(self, endpoint: str, thumbnail_width: int = 250):
-        self.endpoint = endpoint
+    def __init__(self, endpoint: str, origin: str = None, thumbnail_width: int = 250):
+        self.endpoint = URLObject(endpoint)
+        self.origin = URLObject(origin) if origin is not None else None
         self.thumbnail_width = thumbnail_width
 
     def get_metadata(self, image_id: str) -> ImageInfo:
-        url = f'{self.endpoint}/{image_id}'
+        image_resource = ImageResource(endpoint=self.endpoint, origin=self.origin, image_id=image_id)
         try:
-            response = requests.get(url)
+            response = requests.get(image_resource.info_url, headers=image_resource.forwarding_headers)
         except requests.ConnectionError as e:
             logger.error(f'Unable to retrieve metadata from IIIF Image Service: {e}')
             raise ImageServiceError(f'Problem retrieving image: {e}') from e

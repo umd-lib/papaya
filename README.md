@@ -18,6 +18,8 @@ IIIF Presentation API Application
   queries that will return hit highlight annotation lists
 * **`PAPAYA_IIIF_IMAGE_ENDPOINT`** URL of the IIIF Image API server that 
   provides additional metadata about the images.
+* **`PAPAYA_IIIF_IMAGE_ORIGIN`** Actual request URL to use for the IIIF 
+  Image API server, if it differs from `PAPAYA_IIIF_IMAGE_ENDPOINT`
 * **`PAPAYA_THUMBNAIL_WIDTH`** Maximum width of thumbnail images included 
   in the manifest.
 * **`PAPAYA_LOGO_URL`** URL of an image file to be used as the logo in the 
@@ -53,6 +55,41 @@ IIIF Presentation API Application
     $*page_label: .object__has_member[]|select(.id == $uri).page__title__txt
     $*file_page_uri: .object__has_member[]|select(.page__has_file[].id == $uri).id
     ```
+
+### IIIF Image Service Endpoint vs. Origin
+
+The `PAPAYA_IIIF_IMAGE_ENDPOINT` is the canonical base URI for the
+IIIF Image server associated with this instance of Papaya. For many cases,
+it will also be the base URL that is used to make requests to that service.
+
+However, there are cases where it makes more sense to be able to separate 
+the canonical base URI from the request base URL. For instance, consider 
+the case where both Papaya and the IIIF Image server are running inside a 
+Kubernetes cluster and can be connected directly without leaving the 
+internal Kubernetes network. In this case, it would be beneficial to be 
+able to use the cluster-internal base URL to make the HTTP connections, 
+while retaining the canonical URI any links in the generated manifest.
+
+In this case, use `PAPAYA_IIIF_IMAGE_ORIGIN` to set the request base URL 
+for the IIIF Image service. When this value is set, Papaya will use it 
+instead of `PAPAYA_IIIF_IMAGE_ENDPOINT` to generate request URLs. In 
+addition, Papaya will create a set of `X-Forwarded-*` headers to add to 
+requests that reflect the canonical URI.
+
+For example, given:
+
+* `PAPAYA_IIIF_IMAGE_ENDPOINT` is `https://iiif.example.com/images/iiif/2`
+* `PAPAYA_IIIF_IMAGE_ORIGIN` is `http://papaya:3001/iiif/2`
+
+The headers would be:
+
+* `X-Forwarded-Proto: https`
+* `X-Forwarded-Host: iiif.example.com`
+* `X-Forwarded-Path: /images`
+
+The `X-Forwarded-Path` is calculated by removing the path of the origin 
+URL (e.g., `/iiif/2`) from the end of the path of the endpoint URI (e.g., 
+`/images/iiif/2`).
 
 ## Development Setup
 
