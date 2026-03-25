@@ -8,15 +8,15 @@ from papaya.iiif2 import ImageResource
     ('endpoint', 'origin', 'image_id', 'expected_image_uri', 'expected_request_url'),
     [
         (
-            'https://iiif.example.com/images/iiif/2',
+            URLObject('https://iiif.example.com/images/iiif/2'),
             None,
             'foo:123',
             'https://iiif.example.com/images/iiif/2/foo:123',
             'https://iiif.example.com/images/iiif/2/foo:123',
         ),
         (
-            'https://iiif.example.com/images/iiif/2',
-            'http://papaya:3001/iiif/2',
+            URLObject('https://iiif.example.com/images/iiif/2'),
+            URLObject('http://papaya:3001/iiif/2'),
             'foo:123',
             'https://iiif.example.com/images/iiif/2/foo:123',
             'http://papaya:3001/iiif/2/foo:123',
@@ -24,7 +24,7 @@ from papaya.iiif2 import ImageResource
     ]
 )
 def test_image_resource_uris(endpoint, origin, image_id, expected_image_uri, expected_request_url):
-    service = ImageResource(endpoint=URLObject(endpoint), origin=URLObject(origin), image_id=image_id)
+    service = ImageResource(endpoint=endpoint, origin=origin, image_id=image_id)
     assert service.image_uri == expected_image_uri
     assert service.request_url == expected_request_url
 
@@ -34,14 +34,14 @@ def test_image_resource_uris(endpoint, origin, image_id, expected_image_uri, exp
     [
         # no separate origin URL
         (
-            'https://iiif.example.com/images/iiif/2',
+            URLObject('https://iiif.example.com/images/iiif/2'),
             None,
             {},
         ),
         # separate origin URL, paths identical
         (
-            'https://iiif.example.com/iiif/2',
-            'http://papaya:3001/iiif/2',
+            URLObject('https://iiif.example.com/iiif/2'),
+            URLObject('http://papaya:3001/iiif/2'),
             {
                 'X-Forwarded-Proto': 'https',
                 'X-Forwarded-Host': 'iiif.example.com',
@@ -49,8 +49,8 @@ def test_image_resource_uris(endpoint, origin, image_id, expected_image_uri, exp
         ),
         # separate origin URL, endpoint path has an extra prefix compared to origin path
         (
-                'https://iiif.example.com/images/iiif/2',
-                'http://papaya:3001/iiif/2',
+                URLObject('https://iiif.example.com/images/iiif/2'),
+                URLObject('http://papaya:3001/iiif/2'),
                 {
                     'X-Forwarded-Proto': 'https',
                     'X-Forwarded-Host': 'iiif.example.com',
@@ -60,5 +60,5 @@ def test_image_resource_uris(endpoint, origin, image_id, expected_image_uri, exp
     ]
 )
 def test_image_resource_forwarding_headers(endpoint, origin, expected_headers):
-    service = ImageResource(endpoint=URLObject(endpoint), origin=URLObject(origin), image_id='foobar')
+    service = ImageResource(endpoint=endpoint, origin=origin, image_id='foobar')
     assert service.forwarding_headers == expected_headers
