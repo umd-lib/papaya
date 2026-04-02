@@ -1,5 +1,5 @@
 [project]
-name = "papaya"
+name = "papaya-iiif"
 version = "1.1.0"
 description = "IIIF Presentation API implementation"
 authors = [
