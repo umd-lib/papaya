@@ -1,6 +1,14 @@
 [project]
 name = "papaya"
-version = "1.0.1"
+version = "1.1.0"
+description = "IIIF Presentation API implementation"
+authors = [
+    { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
+    { name='Peter Eichman', email='peichman@umd.edu' },
+    { name='David Steelman', email='dsteelma@umd.edu' },
+    { name='Marc Andreu Grillo Aguilar', email='aguilarm@umd.edu' },
+]
+readme = "README.md"
 requires-python = ">= 3.14"
 dependencies = [
     "click",
