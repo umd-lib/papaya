@@ -1,7 +1,7 @@
 import pytest
 from urlobject import URLObject
 
-from papaya.iiif2 import ImageResource
+from papaya.iiif2 import ImageResource, ImageParams
 
 
 @pytest.mark.parametrize(
@@ -24,9 +24,9 @@ from papaya.iiif2 import ImageResource
     ]
 )
 def test_image_resource_uris(endpoint, origin, image_id, expected_image_uri, expected_request_url):
-    service = ImageResource(endpoint=endpoint, origin=origin, image_id=image_id)
-    assert service.image_uri == expected_image_uri
-    assert service.request_url == expected_request_url
+    resource = ImageResource(endpoint=endpoint, origin=origin, image_id=image_id)
+    assert resource.uri() == expected_image_uri
+    assert resource.request_url() == expected_request_url
 
 
 @pytest.mark.parametrize(
@@ -60,5 +60,36 @@ def test_image_resource_uris(endpoint, origin, image_id, expected_image_uri, exp
     ]
 )
 def test_image_resource_forwarding_headers(endpoint, origin, expected_headers):
-    service = ImageResource(endpoint=endpoint, origin=origin, image_id='foobar')
-    assert service.forwarding_headers == expected_headers
+    resource = ImageResource(endpoint=endpoint, origin=origin, image_id='foobar')
+    assert resource.forwarding_headers == expected_headers
+
+
+@pytest.mark.parametrize(
+    ('params', 'expected_uri', 'expected_request_url'),
+    [
+        (
+            None,
+            'https://iiif.example.com/iiif/2/foo:123',
+            'http://papaya:3001/iiif/2/foo:123',
+        ),
+        (
+            ImageParams(
+                region='full',
+                size='100,100',
+                rotation='90',
+                quality='default',
+                format='png',
+            ),
+            'https://iiif.example.com/iiif/2/foo:123/full/100,100/90/default.png',
+            'http://papaya:3001/iiif/2/foo:123/full/100,100/90/default.png',
+        ),
+    ]
+)
+def test_image_resource_with_params(params, expected_uri, expected_request_url):
+    resource = ImageResource(
+        endpoint=URLObject('https://iiif.example.com/iiif/2'),
+        origin=URLObject('http://papaya:3001/iiif/2'),
+        image_id='foo:123',
+    )
+    assert resource.uri(params) == expected_uri
+    assert resource.request_url(params) == expected_request_url

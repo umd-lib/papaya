@@ -76,20 +76,22 @@ class ImageResource:
     image_id: str
     origin: URLObject = None
 
-    @property
-    def request_url(self) -> str:
-        if self.origin:
-            return f'{self.origin}/{self.image_id}'
+    def request_url(self, params: ImageParams = None) -> str:
+        base = self.origin if self.origin else self.endpoint
+        if params is not None:
+            return f'{base}/{self.image_id}{params}'
         else:
-            return f'{self.endpoint}/{self.image_id}'
+            return f'{base}/{self.image_id}'
 
     @property
     def info_url(self):
-        return f'{self.request_url}/info.json'
+        return f'{self.request_url()}/info.json'
 
-    @property
-    def image_uri(self) -> str:
-        return f'{self.endpoint}/{self.image_id}'
+    def uri(self, params: ImageParams = None) -> str:
+        if params is not None:
+            return f'{self.endpoint}/{self.image_id}{params}'
+        else:
+            return f'{self.endpoint}/{self.image_id}'
 
     @property
     def forwarding_headers(self) -> dict[str, str]:
@@ -114,8 +116,11 @@ class ImageService:
         self.origin = URLObject(origin) if origin is not None else None
         self.thumbnail_width = thumbnail_width
 
+    def resource(self, image_id: str) -> ImageResource:
+        return ImageResource(endpoint=self.endpoint, origin=self.origin, image_id=image_id)
+
     def get_metadata(self, image_id: str) -> ImageInfo:
-        image_resource = ImageResource(endpoint=self.endpoint, origin=self.origin, image_id=image_id)
+        image_resource = self.resource(image_id)
         try:
             response = requests.get(image_resource.info_url, headers=image_resource.forwarding_headers)
         except requests.ConnectionError as e:
