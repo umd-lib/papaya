@@ -5,4 +5,4 @@
 
 import importlib.metadata
 
-__version__ = importlib.metadata.version('papaya')
+__version__ = importlib.metadata.version('papaya-iiif')
