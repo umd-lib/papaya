@@ -323,7 +323,7 @@ class SolrService:
                     'hl.fl': self.text_match_field,
                     'hl.q': f'{self.text_match_field}:{text_query}',
                     'hl.snippets': 100,
-                    'hl.fragsize': 50,
+                    'hl.fragsize': 0,
                     'hl.maxAnalyzedChars': 1_000_000,
                     'hl.tag.pre': match_tag,
                     'hl.tag.post': match_tag,
