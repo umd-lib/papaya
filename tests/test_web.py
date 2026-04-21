@@ -25,7 +25,7 @@ def client(app):
 def test_root(client):
     response = client.get('/')
     assert response.status_code == HTTPStatus.FOUND
-    assert response.headers['Location'] == 'http://localhost/manifests/'
+    assert response.headers['Location'] == '/manifests/'
 
 
 def test_manifests_form(client):
@@ -38,25 +38,25 @@ def test_manifests_form(client):
 def test_find_manifest(client):
     response = client.post('/manifests/', data={'uri': 'http://fcrepo-local:8080/fcrepo/rest/123'})
     assert response.status_code == HTTPStatus.FOUND
-    assert response.headers['Location'] == 'http://localhost/manifests/fcrepo:123/manifest'
+    assert response.headers['Location'] == '/manifests/fcrepo:123/manifest'
 
 
 def test_find_manifest_with_query(client):
     response = client.post('/manifests/', data={'uri': 'http://fcrepo-local:8080/fcrepo/rest/123', 'text_query': 'foo'})
     assert response.status_code == HTTPStatus.FOUND
-    assert response.headers['Location'] == 'http://localhost/manifests/fcrepo:123/manifest?q=foo'
+    assert response.headers['Location'] == '/manifests/fcrepo:123/manifest?q=foo'
 
 
 @pytest.mark.parametrize(
     ('request_path', 'canonical_url'),
     [
-        ('/manifests/foobar/manifest.json', 'http://localhost/manifests/foobar/manifest'),
-        ('/manifests/foobar/', 'http://localhost/manifests/foobar/manifest'),
+        ('/manifests/foobar/manifest.json', '/manifests/foobar/manifest'),
+        ('/manifests/foobar/', '/manifests/foobar/manifest'),
         # preserves query string
-        ('/manifests/foobar/manifest.json?q=swordfish', 'http://localhost/manifests/foobar/manifest?q=swordfish'),
-        ('/manifests/foobar/?q=swordfish', 'http://localhost/manifests/foobar/manifest?q=swordfish'),
-        ('/manifests/foobar/manifest.json?ANY_STRING', 'http://localhost/manifests/foobar/manifest?ANY_STRING'),
-        ('/manifests/foobar/?ANY_STRING', 'http://localhost/manifests/foobar/manifest?ANY_STRING'),
+        ('/manifests/foobar/manifest.json?q=swordfish', '/manifests/foobar/manifest?q=swordfish'),
+        ('/manifests/foobar/?q=swordfish', '/manifests/foobar/manifest?q=swordfish'),
+        ('/manifests/foobar/manifest.json?ANY_STRING', '/manifests/foobar/manifest?ANY_STRING'),
+        ('/manifests/foobar/?ANY_STRING', '/manifests/foobar/manifest?ANY_STRING'),
     ]
 )
 def test_redirect_to_manifest(client, request_path, canonical_url):
