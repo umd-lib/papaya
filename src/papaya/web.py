@@ -83,7 +83,7 @@ def create_app():
 
     @app.route('/')
     def root():
-        return redirect(url_for('manifests_form'), HTTPStatus.FOUND)
+        return redirect(url_for('manifests_form', _external=True), HTTPStatus.FOUND)
 
     @app.route('/manifests/', methods=['GET'])
     def manifests_form():
@@ -119,7 +119,10 @@ def create_app():
     @app.route('/manifests/<manifest_id>/manifest.json')
     def redirect_to_manifest(manifest_id: str):
         """Redirects requests for the manifest to its canonical URL."""
-        return redirect(url_for('get_manifest', manifest_id=manifest_id), HTTPStatus.MOVED_PERMANENTLY)
+        url = url_for('get_manifest', manifest_id=manifest_id, _external=True)
+        if request.query_string:
+            url += f'?{request.query_string.decode()}'
+        return redirect(url, HTTPStatus.MOVED_PERMANENTLY)
 
     @app.route('/manifests/<manifest_id>/manifest')
     def get_manifest(manifest_id: str):
