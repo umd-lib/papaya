@@ -249,8 +249,6 @@ class Sequence:
             '@type': 'sc:Sequence',
             'canvases': [canvas.json() for canvas in self.canvases],
         }
-        if len(self.canvases) > 0:
-            sequence_info['startCanvas'] = self.canvases[0].uri
 
         if with_context:
             sequence_info.update({'@context': PRESENTATION_API_CONTEXT})
