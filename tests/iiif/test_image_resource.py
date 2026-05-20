@@ -1,7 +1,7 @@
 import pytest
 from urlobject import URLObject
 
-from papaya.iiif2 import ImageResource, ImageParams
+from papaya.iiif.image import ImageParams, ImageResource
 
 
 @pytest.mark.parametrize(
