@@ -41,12 +41,6 @@ def test_find_manifest(client):
     assert response.headers['Location'] == '/manifests/fcrepo:123/manifest'
 
 
-def test_find_manifest_with_query(client):
-    response = client.post('/manifests/', data={'uri': 'http://fcrepo-local:8080/fcrepo/rest/123', 'text_query': 'foo'})
-    assert response.status_code == HTTPStatus.FOUND
-    assert response.headers['Location'] == '/manifests/fcrepo:123/manifest?q=foo'
-
-
 @pytest.mark.parametrize(
     ('request_path', 'canonical_url'),
     [

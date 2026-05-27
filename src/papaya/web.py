@@ -2,20 +2,17 @@ import logging
 import os
 import re
 from http import HTTPStatus
-from urllib.parse import urlencode
 
 from configurenv import load_config_from_files
 from flask import Flask, url_for, redirect, request
 
 from papaya import __version__
-from papaya.errors import (
-    ProblemDetailError,
-    problem_detail_response,
-    SequenceNotFound,
-    CanvasNotFound,
-    AnnotationNotFound,
-)
-from papaya.iiif2 import ImageService, DEFAULT_THUMBNAIL_WIDTH, PresentationContext, SearchHitsList
+from papaya.context import PapayaContext
+from papaya.errors import ProblemDetailError, problem_detail_response, SequenceNotFound, CanvasNotFound, \
+    AnnotationNotFound, MissingQueryParameter
+from papaya.iiif import DEFAULT_THUMBNAIL_WIDTH
+from papaya.iiif.image import ImageService
+from papaya.iiif.search import SearchResultsList
 from papaya.source import RepositoryService, SolrService
 
 debug_mode = int(os.environ.get('FLASK_DEBUG', '0'))
@@ -56,7 +53,7 @@ def create_app():
     app.logger.info(f'papaya/{__version__}')
     app.logger.debug(app.config)
 
-    ctx = PresentationContext(
+    ctx = PapayaContext(
         solr_service=SolrService(
             endpoint=app.config['SOLR_ENDPOINT'],
             metadata_queries=app.config.get('METADATA_QUERIES', {}),
@@ -97,7 +94,6 @@ def create_app():
             <h1>Papaya</h1>
             <form method="post" action="">
               <label>URI: <input name="uri" type="text" size="80"/></label>
-              <label>Text query: <input name="text_query" type="text"/></label>
               <button type="submit">Submit</button>
             </form>
             <hr/>
@@ -111,8 +107,6 @@ def create_app():
         """Redirects to the actual manifest URL using the resource URL submitted
         via the form."""
         url = url_for('get_manifest', manifest_id=ctx.get_iiif_id(request.form['uri']))
-        if text_query := request.form.get('text_query', None):
-            url += f'?{urlencode({"q": text_query})}'
         return redirect(url, HTTPStatus.FOUND)
 
     @app.route('/manifests/<manifest_id>/')
@@ -129,7 +123,7 @@ def create_app():
         """Implements the manifest response.
 
         See also: https://iiif.io/api/presentation/2.1/#manifest"""
-        return ctx.get_manifest(manifest_id, request.args.get('q', None)).json(with_context=True)
+        return ctx.get_manifest(manifest_id).json(with_context=True)
 
     @app.route('/manifests/<manifest_id>/sequence/<sequence_name>')
     def get_sequence(manifest_id: str, sequence_name: str):
@@ -137,7 +131,7 @@ def create_app():
 
         See also: https://iiif.io/api/presentation/2.1/#sequence"""
         try:
-            manifest = ctx.get_manifest(manifest_id, request.args.get('q', None))
+            manifest = ctx.get_manifest(manifest_id)
             return manifest.find_sequence(sequence_name).json(with_context=True)
         except KeyError as e:
             raise SequenceNotFound(sequence_name=sequence_name, manifest_id=manifest_id) from e
@@ -148,7 +142,7 @@ def create_app():
 
         See also: https://iiif.io/api/presentation/2.1/#canvas"""
         try:
-            manifest = ctx.get_manifest(manifest_id, request.args.get('q', None))
+            manifest = ctx.get_manifest(manifest_id)
             return manifest.find_canvas(canvas_name).json(with_context=True)
         except KeyError as e:
             raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
@@ -163,14 +157,35 @@ def create_app():
         except KeyError as e:
             raise AnnotationNotFound(annotation_name=annotation_name, manifest_id=manifest_id) from e
 
-    @app.route('/manifests/<manifest_id>/list/<canvas_name>-search')
+    @app.route('/manifests/<manifest_id>/manifest/search')
+    def get_search(manifest_id: str):
+        """Implements the search result annotation list response for a manifest.
+
+        See also: https://iiif.io/api/search/1.0/#simple-lists"""
+        manifest = ctx.get_manifest(manifest_id)
+        try:
+            results = SearchResultsList(manifest, request.args['q'])
+        except KeyError as e:
+            raise MissingQueryParameter(param_name=e.args[0]) from e
+
+        return results.json(with_context=True)
+
+    @app.route('/manifests/<manifest_id>/canvas/<canvas_name>/search')
     def get_annotation_list(manifest_id: str, canvas_name: str):
+        """Implements the search result annotation list response for a canvas.
+
+        See also: https://iiif.io/api/search/1.0/#simple-lists"""
         try:
             canvas = ctx.get_manifest(manifest_id).find_canvas(canvas_name)
         except KeyError as e:
             raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
 
-        return SearchHitsList(canvas, request.args.get('q')).json(with_context=True)
+        try:
+            results = SearchResultsList(canvas, request.args['q'])
+        except KeyError as e:
+            raise MissingQueryParameter(param_name=e.args[0]) from e
+
+        return results.json(with_context=True)
 
     app.register_error_handler(ProblemDetailError, problem_detail_response)
 

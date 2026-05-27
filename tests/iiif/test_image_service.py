@@ -4,10 +4,10 @@ import pytest
 import requests
 from requests import Response
 
-from papaya.iiif2 import ImageService, ImageServiceError
+from papaya.iiif.image import ImageServiceError, ImageService
 
 
-@patch('papaya.iiif2.requests.get')
+@patch('papaya.iiif.image.requests.get')
 def test_image_service_get_metadata(mock_get):
     mock_response = MagicMock(ok=True)
     mock_response.json.return_value = {
@@ -27,7 +27,7 @@ def test_image_service_get_metadata(mock_get):
     assert info.height == 768
 
 
-@patch('papaya.iiif2.requests.get')
+@patch('papaya.iiif.image.requests.get')
 def test_image_service_get_metadata_connection_error(mock_get):
     mock_get.side_effect = requests.ConnectionError()
     service = ImageService('http://example.com/iiif2')
@@ -35,7 +35,7 @@ def test_image_service_get_metadata_connection_error(mock_get):
         service.get_metadata('foo')
 
 
-@patch('papaya.iiif2.requests.get')
+@patch('papaya.iiif.image.requests.get')
 def test_image_service_get_metadata_problem(mock_get):
     mock_get.return_value = MagicMock(spec=Response, ok=False, status_code=400)
     service = ImageService('http://example.com/iiif2')

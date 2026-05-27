@@ -69,7 +69,10 @@ Would yield this metadata mapping in the output manifest:
 
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Iterator
+from dataclasses import dataclass
+from functools import cached_property
+from hashlib import sha1
 from typing import NamedTuple, Any
 from urllib.parse import parse_qsl
 from uuid import uuid4
@@ -304,7 +307,7 @@ class SolrService:
         """Get the `Resource` object representing the given `resource_uri`."""
         return Resource(self.get_doc(resource_uri), self.metadata_queries)
 
-    def get_text_matches(self, resource_uri: str, text_query: str, index: int = None) -> list[TaggedText]:
+    def get_text_matches(self, resource_uri: str, text_query: str, index: int = None) -> list[SolrHit]:
         """Search the `text_match_field` of the resource with the given `resource_uri`
         for occurrences of `text_query`, using Solr's highlighting capabilities. Returns
         a list of `TaggedText` objects that represent each instance that matched.
@@ -316,14 +319,16 @@ class SolrService:
         match_tag = f'<<{uuid4()}>>'
         try:
             results = self._solr.search(
-                q=f'{{!term f={self.uri_field} v=$id}}',
+                q=text_query,
+                fq=f'{{!term f={self.uri_field} v=$id}}',
                 id=resource_uri,
+                qf=self.text_match_field,
+                defType='edismax',
                 hl='on',
                 **{
                     'hl.fl': self.text_match_field,
-                    'hl.q': f'{self.text_match_field}:{text_query}',
                     'hl.snippets': 100,
-                    'hl.fragsize': 0,
+                    'hl.fragsize': 25,
                     'hl.maxAnalyzedChars': 1_000_000,
                     'hl.tag.pre': match_tag,
                     'hl.tag.post': match_tag,
@@ -333,13 +338,76 @@ class SolrService:
             raise SolrLookupError(str(e)) from e
 
         hits = []
-        for text in results.highlighting[resource_uri].get(self.text_match_field, []):
-            hits.extend(TaggedText.parse(x) for i, x in enumerate(text.split(match_tag)) if i % 2 == 1)
+        for snippet_text in results.highlighting.get(resource_uri, {}).get(self.text_match_field, []):
+            hits.extend(SolrSnippet(snippet_text, match_tag).hits)
 
         if index is not None:
-            return [h for h in hits if int(h.params['n']) == index]
+            return [h for h in hits if int(h.hit.params['n']) == index]
         else:
             return hits
+
+
+@dataclass
+class SolrSnippet:
+    """Represents a single snippet of highlighted text found in the `highlighting`
+    section of a Solr search result. Contains one or more actual search hits."""
+
+    text: str
+    """Raw text returned from the Solr search result"""
+    match_tag: str
+    """The string used for the `hl.tag.pre` and `hl.tag.post` in the search that
+    generated this snippet."""
+
+    @cached_property
+    def slug(self) -> str:
+        """Generate a quasi-unique slug for this snippet by taking the snippet text,
+        stripping out the unique `match_tag`, calculating the SHA1 digest of the text,
+        and truncating to the first 8 characters of the hex representation of the
+        digest."""
+        return sha1(self.text.replace(self.match_tag, '').encode()).hexdigest()[:8]
+
+    @cached_property
+    def hits(self) -> Iterator[SolrHit]:
+        """Returns an iterator over the individual highlighted search hits in this
+        snippet. Each search hit is represented by a `SolrHit` object."""
+
+        pieces = self.text.split(self.match_tag)
+        for n, i in enumerate(range(1, len(pieces), 2), 1):
+            if '|' not in pieces[i]:
+                continue
+            yield SolrHit(
+                id=f'{self.slug}-{n}',
+                tokens_before=[TaggedText.parse(x) for x in pieces[i - 1].split(' ') if '|' in x],
+                match=TaggedText.parse(pieces[i]),
+                tokens_after=[TaggedText.parse(x) for x in pieces[i + 1].split(' ') if '|' in x],
+            )
+
+
+@dataclass
+class SolrHit:
+    """Represents a single search hit (i.e., instance of the query text) along
+    with its context."""
+
+    id: str
+    """Quasi-unique identifier for this Solr search hit"""
+    tokens_before: list[TaggedText]
+    """List of zero or more `TaggedText` tokens that appear before this hit
+    in their parent snippet"""
+    match: TaggedText
+    """The `TaggedText` token of the matching text for this search hit."""
+    tokens_after: list[TaggedText]
+    """List of zero or more `TaggedText` tokens that appear after this hit
+    in their parent snippet"""
+
+    @property
+    def before(self) -> str:
+        """The text portions of the tokens in `tokens_before`, joined with spaces."""
+        return ' '.join(str(x) for x in self.tokens_before)
+
+    @property
+    def after(self) -> str:
+        """The text portions of the tokens in `tokens_after`, joined with spaces."""
+        return ' '.join(str(x) for x in self.tokens_after)
 
 
 class TaggedText(NamedTuple):
@@ -358,3 +426,6 @@ class TaggedText(NamedTuple):
             text=text,
             params=dict(parse_qsl(tag)),
         )
+
+    def __str__(self):
+        return self.text

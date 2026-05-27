@@ -69,6 +69,11 @@ class IdentifierProblem(ProblemDetailError, BadRequest):
     description = 'The identifier {iiif_id} is not recognized as a valid IIIF identifier'
 
 
+class MissingQueryParameter(ProblemDetailError, BadRequest):
+    name = 'Missing query parameter'
+    description = 'The query parameter "{param_name}" is required.'
+
+
 class ManifestNotAvailable(ProblemDetailError, NotFound):
     name = 'Manifest not available'
     description = 'No manifest is available for the resource with URI "{uri}"'
