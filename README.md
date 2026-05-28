@@ -2,6 +2,31 @@
 
 IIIF Presentation API Application
 
+## Description
+
+Papaya is a Python Flask web application that implements the following 
+[IIIF APIs](https://iiif.io/api/):
+
+* [Presentation API 2.1.1](https://iiif.io/api/presentation/2.1/)
+* [Content Search API 1.0.0](https://iiif.io/api/search/1.0/)
+
+## Installation
+
+Requires Python 3.14
+
+Papaya is available [on PyPI](https://pypi.org/project/papaya-iiif/) and 
+can be installed with *pip* or *pipx*:
+
+```zsh
+# recommended if you are planning to reuse parts of Papaya in your own code 
+pip install papaya-iiif
+
+# recommended if you just want to use the "papaya" server application
+pipx install papaya-iiif
+```
+
+(Note that the package name is *papaya-**iiif***, not just *papaya*.)
+
 ## Configuration
 
 ### Environment Variables
@@ -90,6 +115,28 @@ The headers would be:
 The `X-Forwarded-Path` is calculated by removing the path of the origin 
 URL (e.g., `/iiif/2`) from the end of the path of the endpoint URI (e.g., 
 `/images/iiif/2`).
+
+## Running
+
+```zsh
+papaya
+```
+
+Papaya listens on port 5000 by default: <http://localhost:5000/>
+
+To change, you can specify a different port:
+
+```zsh
+papaya --listen :3002
+```
+
+Then it will be listening at <http://localhost:3002/>
+
+To see all options:
+
+```zsh
+papaya --help
+```
 
 ## Development Setup
 
