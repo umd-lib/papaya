@@ -8,6 +8,11 @@ def resource(solr_doc, metadata_queries):
     return Resource(doc=solr_doc, metadata_queries=metadata_queries)
 
 
+@pytest.fixture
+def resource_with_ocr(solr_doc_with_ocr, metadata_queries):
+    return Resource(doc=solr_doc_with_ocr, metadata_queries=metadata_queries)
+
+
 def test_uri(resource):
     assert resource.uri == 'http://example.com/fcrepo/123'
 
@@ -64,3 +69,11 @@ def test_get_page_image_id(resource):
 
 def test_get_page_label(resource):
     assert resource.get_page_label('http://example.com/fcrepo/123/p/2') == 'Page 2'
+
+
+def test_is_not_searchable(resource):
+    assert resource.is_searchable is False
+
+
+def test_is_searchable(resource_with_ocr):
+    assert resource_with_ocr.is_searchable is True

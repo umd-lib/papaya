@@ -16,6 +16,8 @@ structure and basic manifest metadata:
 * **`$page_uris`** Returns a list of page URIs in page order
 * **`$page_image_ids`** Returns a list of IIIF Image IDs for the pages,
   in the same order as the `$page_uris`
+* **`$is_searchable` Returns true if the resource described by this
+  manifest has searchable text content (e.g., OCR text)
 
 Metadata queries whose keys begin with `$*` all take arguments at
 runtime:
@@ -154,7 +156,7 @@ class URLError(ValueError):
 class Resource:
     """A digital object that has a IIIF manifest."""
 
-    def __init__(self, doc: Mapping[str, Any], metadata_queries: Mapping[str, str] = None):
+    def __init__(self, doc: Mapping[str, Any], metadata_queries: Mapping[str, str] | None = None):
         self.doc = doc
         """Mapping of digital object metadata. Typically a Solr document."""
         self.metadata_queries = metadata_queries or {}
@@ -220,6 +222,10 @@ class Resource:
         keys = [k for k in self.metadata_queries.keys() if not k.startswith('$')]
         metadata = [{'label': k, 'value': [format_value(v) for v in self._query(k) if v is not None]} for k in keys]
         return [m for m in metadata if m['value']]
+
+    @property
+    def is_searchable(self) -> bool:
+        return self._query('$is_searchable').first()
 
     def index(self, page_uri: str) -> int:
         """Given a page URI, return the (0-based) index of that page in the
@@ -307,7 +313,7 @@ class SolrService:
         """Get the `Resource` object representing the given `resource_uri`."""
         return Resource(self.get_doc(resource_uri), self.metadata_queries)
 
-    def get_text_matches(self, resource_uri: str, text_query: str, index: int = None) -> list[SolrHit]:
+    def get_text_matches(self, resource_uri: str, text_query: str, index: int | None = None) -> list[SolrHit]:
         """Search the `text_match_field` of the resource with the given `resource_uri`
         for occurrences of `text_query`, using Solr's highlighting capabilities. Returns
         a list of `TaggedText` objects that represent each instance that matched.

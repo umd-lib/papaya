@@ -50,13 +50,7 @@ def test_json(papaya_context):
     assert json['metadata'] == {}
     assert json['description'] == 'Testing manifest'
     assert len(json['sequences']) == 1
-    assert json['service'] == [
-        {
-            '@context': SEARCH_API_1_CONTEXT,
-            '@id': 'http://example.com/manifests/test/manifest/search',
-            'profile': SEARCH_API_1_PROFILE,
-        }
-    ]
+    assert json['service'] == []
     assert json['navDate'] == '2026-05-22'
     assert json['license'] == 'CC-BY-NC-SA'
     assert json['logo'] == {'@id': 'http://example.com/logo'}
@@ -68,3 +62,16 @@ def test_json_with_context(papaya_context):
     manifest = Manifest(papaya_context, id='test')
     json = manifest.json(with_context=True)
     assert json['@context'] == PRESENTATION_API_2_CONTEXT
+
+
+def test_json_with_search_service(papaya_context):
+    papaya_context.get_resource.return_value.is_searchable = True
+    manifest = Manifest(papaya_context, id='test')
+    json = manifest.json()
+    assert json['service'] == [
+        {
+            '@context': SEARCH_API_1_CONTEXT,
+            '@id': 'http://example.com/manifests/test/manifest/search',
+            'profile': SEARCH_API_1_PROFILE,
+        }
+    ]
