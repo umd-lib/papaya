@@ -38,6 +38,11 @@ def solr_doc():
 
 
 @pytest.fixture
+def solr_doc_with_ocr(solr_doc):
+    return {**solr_doc, 'extracted_text__dps_txt': 'Once upon a midnight dreary, while I pondered weak and weary...'}
+
+
+@pytest.fixture
 def metadata_queries():
     return {
         '$uri': '.id',
@@ -46,6 +51,7 @@ def metadata_queries():
         '$date': '.date__str',
         '$license_uri': '.license',
         '$page_image_ids': '.images__ids[]',
+        '$is_searchable': 'has("extracted_text__dps_txt")',
         '$*page_doc': '.pages[]|select(.id == $uri)',
         '$*page_label': '.pages[]|select(.id == $uri).title',
         '$*file_page_uri': '.pages[]|select(.files[].id == $uri).id',

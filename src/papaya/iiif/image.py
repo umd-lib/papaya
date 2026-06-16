@@ -79,7 +79,7 @@ class ImageResource:
     image_id: str
     origin: URLObject | None = None
 
-    def request_url(self, params: ImageParams = None) -> str:
+    def request_url(self, params: ImageParams | None = None) -> str:
         base = self.origin if self.origin else self.endpoint
         if params is not None:
             return f'{base}/{self.image_id}{params}'
@@ -90,7 +90,7 @@ class ImageResource:
     def info_url(self):
         return f'{self.request_url()}/info.json'
 
-    def uri(self, params: ImageParams = None) -> str:
+    def uri(self, params: ImageParams | None = None) -> str:
         if params is not None:
             return f'{self.endpoint}/{self.image_id}{params}'
         else:
@@ -114,7 +114,7 @@ class ImageResource:
 class ImageService:
     """IIIF Image API service endpoint."""
 
-    def __init__(self, endpoint: str, origin: str = None, thumbnail_width: int = 250):
+    def __init__(self, endpoint: str, origin: str | None = None, thumbnail_width: int = 250):
         self.endpoint = URLObject(endpoint)
         self.origin = URLObject(origin) if origin is not None else None
         self.thumbnail_width = thumbnail_width

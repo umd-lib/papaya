@@ -13,6 +13,7 @@ $description: .object__description__display[]?
 $license_uri: .object__rights__same_as__uris[0]
 $page_uris: .page_uri_sequence__uris[]?
 $page_image_ids: .iiif_thumbnail_sequence__ids[]?
+$is_searchable: has("extracted_text__dps_txt")
 $*page_doc: .object__has_member[]|select(.id == $uri)
 $*page_label: .object__has_member[]|select(.id == $uri).page__title__txt
 $*file_page_uri: .object__has_member[]|select(.page__has_file[].id == $uri).id

@@ -1,8 +1,10 @@
 from http import HTTPStatus
+from unittest.mock import MagicMock
 
 import pytest
 
 from papaya import __version__
+from papaya.iiif.presentation import Manifest
 from papaya.web import create_app
 
 
@@ -57,3 +59,16 @@ def test_redirect_to_manifest(client, request_path, canonical_url):
     response = client.get(request_path)
     assert response.status_code == HTTPStatus.MOVED_PERMANENTLY
     assert response.headers['Location'] == canonical_url
+
+
+def test_get_search(app, get_mock_context, get_mock_resource):
+    ctx = get_mock_context(get_mock_resource(searchable=True))
+    mock_manifest = MagicMock(spec=Manifest)
+    mock_manifest.search_text.return_value = []
+    ctx.get_manifest.return_value = mock_manifest
+    app.config['papaya_context'] = ctx
+    client = app.test_client()
+    response = client.get('/manifests/fcrepo:123/manifest/search?q=swordfish')
+    assert response.status_code == HTTPStatus.OK
+    assert response.content_type == 'application/json'
+    assert response.json['@type'] == 'sc:AnnotationList'

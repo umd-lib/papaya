@@ -50,10 +50,9 @@ def create_app():
     app.config.from_prefixed_env('PAPAYA')
     load_config_from_files(app.config)
 
-    app.logger.info(f'papaya/{__version__}')
-    app.logger.debug(app.config)
-
-    ctx = PapayaContext(
+    # store the application context in the app config, so the unit tests
+    # can easily inject a mock context when needed
+    app.config['papaya_context'] = PapayaContext(
         solr_service=SolrService(
             endpoint=app.config['SOLR_ENDPOINT'],
             metadata_queries=app.config.get('METADATA_QUERIES', {}),
@@ -71,6 +70,9 @@ def create_app():
         endpoint_url=app.config['URL'],
         logo_url=app.config.get('LOGO_URL', None),
     )
+
+    app.logger.info(f'papaya/{__version__}')
+    app.logger.debug(app.config)
 
     @app.before_request
     def rewrite_short_ids():
@@ -106,6 +108,7 @@ def create_app():
     def find_manifest():
         """Redirects to the actual manifest URL using the resource URL submitted
         via the form."""
+        ctx = app.config['papaya_context']
         url = url_for('get_manifest', manifest_id=ctx.get_iiif_id(request.form['uri']))
         return redirect(url, HTTPStatus.FOUND)
 
@@ -123,6 +126,7 @@ def create_app():
         """Implements the manifest response.
 
         See also: https://iiif.io/api/presentation/2.1/#manifest"""
+        ctx = app.config['papaya_context']
         return ctx.get_manifest(manifest_id).json(with_context=True)
 
     @app.route('/manifests/<manifest_id>/sequence/<sequence_name>')
@@ -130,6 +134,7 @@ def create_app():
         """Implements the sequence response.
 
         See also: https://iiif.io/api/presentation/2.1/#sequence"""
+        ctx = app.config['papaya_context']
         try:
             manifest = ctx.get_manifest(manifest_id)
             return manifest.find_sequence(sequence_name).json(with_context=True)
@@ -141,6 +146,7 @@ def create_app():
         """Implements the canvas response.
 
         See also: https://iiif.io/api/presentation/2.1/#canvas"""
+        ctx = app.config['papaya_context']
         try:
             manifest = ctx.get_manifest(manifest_id)
             return manifest.find_canvas(canvas_name).json(with_context=True)
@@ -152,6 +158,7 @@ def create_app():
         """Implements the image resource response.
 
         See also: https://iiif.io/api/presentation/2.1/#image-resources"""
+        ctx = app.config['papaya_context']
         try:
             return ctx.get_manifest(manifest_id).find_annotation(annotation_name).json(with_context=True)
         except KeyError as e:
@@ -162,6 +169,7 @@ def create_app():
         """Implements the search result annotation list response for a manifest.
 
         See also: https://iiif.io/api/search/1.0/#simple-lists"""
+        ctx = app.config['papaya_context']
         manifest = ctx.get_manifest(manifest_id)
         try:
             results = SearchResultsList(manifest, request.args['q'])
@@ -175,6 +183,7 @@ def create_app():
         """Implements the search result annotation list response for a canvas.
 
         See also: https://iiif.io/api/search/1.0/#simple-lists"""
+        ctx = app.config['papaya_context']
         try:
             canvas = ctx.get_manifest(manifest_id).find_canvas(canvas_name)
         except KeyError as e:

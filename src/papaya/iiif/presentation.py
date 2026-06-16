@@ -64,16 +64,16 @@ class Manifest:
             'metadata': self.resource.metadata,
             'description': self.resource.description,
             'sequences': [seq.json() for seq in self.sequences],
-            'service': [
-                {
-                    '@context': SEARCH_API_1_CONTEXT,
-                    '@id': f'{self.uri}/search',
-                    'profile': SEARCH_API_1_PROFILE,
-                }
-            ],
+            'service': [],
             'navDate': self.resource.date,
             'license': self.resource.license,
         }
+        if self.resource.is_searchable:
+            manifest_info['service'].append({
+                '@context': SEARCH_API_1_CONTEXT,
+                '@id': f'{self.uri}/search',
+                'profile': SEARCH_API_1_PROFILE,
+            })
         try:
             manifest_info['thumbnail'] = self.sequences[0].canvases[0].thumbnail.json()
         except IndexError:
@@ -222,7 +222,7 @@ class ImageAnnotation:
 class Image:
     """IIIF Image"""
 
-    def __init__(self, service: ImageService, image_id: str, iiif_params: ImageParams = None):
+    def __init__(self, service: ImageService, image_id: str, iiif_params: ImageParams | None = None):
         self.service = service
         self.image_id = image_id
         self.iiif_params = iiif_params
