@@ -105,7 +105,7 @@ requests that reflect the canonical URI.
 For example, given:
 
 * `PAPAYA_IIIF_IMAGE_ENDPOINT` is `https://iiif.example.com/images/iiif/2`
-* `PAPAYA_IIIF_IMAGE_ORIGIN` is `http://papaya:3001/iiif/2`
+* `PAPAYA_IIIF_IMAGE_ORIGIN` is `http://image-service:8182/iiif/2`
 
 The headers would be:
 
@@ -226,7 +226,7 @@ docker build -t docker.lib.umd.edu/papaya .
 ```
 
 When running in a Docker container, the `PAPAYA_SOLR_ENDPOINT` and
-`PAPAYA_IIIF_IMAGE_ENDPOINT` environment variables will need to be
+`PAPAYA_IIIF_IMAGE_ORIGIN` environment variables will need to be
 adjusted to refer to the correct hostname.
 
 Copy the `.env` file set up earlier to `docker.env`, and make these
@@ -234,7 +234,7 @@ changes:
 
 ```dotenv
 PAPAYA_SOLR_ENDPOINT=http://host.docker.internal:8985/solr/fcrepo
-PAPAYA_IIIF_IMAGE_ENDPOINT=http://host.docker.internal:8182/iiif/2
+PAPAYA_IIIF_IMAGE_ORIGIN=http://host.docker.internal:8182/iiif/2
 ```
 
 Run, using this new `docker.env` file:
