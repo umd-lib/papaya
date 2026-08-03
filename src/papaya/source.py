@@ -169,6 +169,7 @@ class Resource:
         }
 
     def _query(self, key: str) -> _ProgramWithInput:
+        logger.debug(f'Running query {key}')
         return self._jq_programs[key].input_value(self.doc)
 
     @property
@@ -184,13 +185,21 @@ class Resource:
         using the string `' / '`."""
         return ' / '.join(self._query('$label'))
 
-    @property
+    @cached_property
     def page_uris(self) -> list[str]:
         """List of URIs of the individual pages of the digital object.
         Metadata query key: `$page_uris`
 
         These should be in the desired presentation order."""
         return self._query('$page_uris').all()
+
+    @cached_property
+    def page_image_ids(self) -> list[str]:
+        """List of IIIF image IDs of the individual pages of the digital
+        object. Metadata query key: `$page_image_ids`
+
+        These should be in the desired presentation order."""
+        return self._query('$page_image_ids').all()
 
     @property
     def date(self) -> str:
@@ -248,9 +257,8 @@ class Resource:
 
     def get_page_image_id(self, page_uri: str) -> str:
         """Given a page URI, returns the IIIF ID of the image that should be
-        displayed on that page. Metadata query key: `$page_image_ids`. The
-        given `page_uri` is passed to the query as the `$uri` argument."""
-        return self._query('$page_image_ids').all()[self.index(page_uri)]
+        displayed on that page."""
+        return self.page_image_ids[self.index(page_uri)]
 
     def get_page_label(self, page_uri: str) -> str:
         """Given a page URI, returns the value to use as the label for that page.
@@ -295,6 +303,7 @@ class SolrService:
         If no document is found, raises a `SolrDocumentNotFound` exception. If more
         than one document is found, or there is some other error sending the request
         to Solr, raises a `SolrLookupError` exception."""
+        logger.info(f'Sending Solr query for {self.uri_field}={resource_uri}')
         try:
             # use the term query parser and pass the URI as a regular query parameter
             # so that Solr itself will handle the escaping of the URI value

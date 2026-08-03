@@ -1,9 +1,12 @@
+import logging
 from functools import cached_property
 from typing import Any
 
 from papaya.iiif import PRESENTATION_API_2_CONTEXT, SEARCH_API_1_CONTEXT, SEARCH_API_1_PROFILE
 from papaya.iiif.image import ImageParams, ImageInfo, ImageService, FULL_IMAGE_PARAMS
 from papaya.source import Resource, SolrHit
+
+logger = logging.getLogger(__name__)
 
 
 class Manifest:
@@ -57,6 +60,7 @@ class Manifest:
         return self.ctx.solr_service.get_text_matches(resource_uri, query)
 
     def json(self, with_context: bool = False) -> dict[str, Any]:
+        logger.debug(f'Serializing manifest {self.uri} to JSON')
         manifest_info: dict[str, Any] = {
             '@id': self.uri,
             '@type': 'sc:Manifest',
@@ -116,6 +120,7 @@ class Sequence:
             raise KeyError(name)
 
     def json(self, with_context: bool = False) -> dict[str, Any]:
+        logger.debug(f'Serializing sequence {self.uri} to JSON')
         sequence_info = {
             '@id': self.uri,
             '@type': 'sc:Sequence',
@@ -165,6 +170,7 @@ class Canvas:
         return self.manifest.ctx.solr_service.get_text_matches(resource_uri, query, page_index)
 
     def json(self, with_context: bool = False) -> dict[str, Any]:
+        logger.debug(f'Serializing canvas {self.uri} to JSON')
         canvas_info = {
             '@id': self.uri,
             '@type': 'sc:Canvas',
@@ -205,6 +211,7 @@ class ImageAnnotation:
         return self.image.info.height
 
     def json(self, with_context: bool = False) -> dict[str, Any]:
+        logger.debug(f'Serializing image annotation {self.uri} to JSON')
         annotation_info = {
             '@id': self.uri,
             '@type': 'oa:Annotation',
@@ -239,6 +246,7 @@ class Image:
         return self.service.get_metadata(self.image_id)
 
     def json(self) -> dict[str, Any]:
+        logger.debug(f'Serializing image {self.uri} to JSON')
         image_info = {
             '@id': self.uri,
             '@type': 'dctypes:Image',
@@ -267,6 +275,7 @@ class ThumbnailImage(Image):
         self.iiif_params = ImageParams(size=f'{self.width},{self.height}')
 
     def json(self) -> dict[str, Any]:
+        logger.debug(f'Serializing thumbnail image {self.uri} to JSON')
         image = super().json()
         image['width'] = self.width
         image['height'] = self.height
