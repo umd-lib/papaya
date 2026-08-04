@@ -5,7 +5,7 @@ import pytest
 
 from papaya import __version__
 from papaya.iiif.presentation import Manifest
-from papaya.web import create_app
+from papaya.web import create_app, get_log_level
 
 
 @pytest.fixture
@@ -22,6 +22,27 @@ def app(monkeypatch):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.mark.parametrize(
+    ('config', 'expected_level'),
+    [
+        # default level is INFO
+        ({}, 'INFO'),
+        ({'LOG_LEVEL': 'CRITICAL'}, 'CRITICAL'),
+        ({'LOG_LEVEL': 'ERROR'}, 'ERROR'),
+        ({'LOG_LEVEL': 'WARNING'}, 'WARNING'),
+        ({'LOG_LEVEL': 'INFO'}, 'INFO'),
+        ({'LOG_LEVEL': 'DEBUG'}, 'DEBUG'),
+        # `DEBUG` (usually set via `FLASK_DEBUG` in the environment)
+        # overrides the `LOG_LEVEL` config and sets it to DEBUG
+        ({'LOG_LEVEL': 'CRITICAL', 'DEBUG': 1}, 'DEBUG'),
+        ({'DEBUG': 1}, 'DEBUG'),
+        ({'DEBUG': 0}, 'INFO'),
+    ]
+)
+def test_get_log_level(config, expected_level):
+    assert get_log_level(config) == expected_level
 
 
 def test_root(client):

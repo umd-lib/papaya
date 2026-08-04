@@ -1,8 +1,10 @@
 import logging
-import os
 import re
+from collections.abc import Mapping
 from http import HTTPStatus
+from typing import Any
 
+from codetiming import Timer
 from configurenv import load_config_from_files
 from flask import Flask, url_for, redirect, request
 
@@ -15,12 +17,21 @@ from papaya.iiif.image import ImageService
 from papaya.iiif.search import SearchResultsList
 from papaya.source import RepositoryService, SolrService
 
-debug_mode = int(os.environ.get('FLASK_DEBUG', '0'))
-logging.basicConfig(
-    level='DEBUG' if debug_mode else 'INFO',
-    format='%(levelname)s:%(threadName)s:%(name)s:%(message)s',
-)
-logger = logging.getLogger(__name__)
+
+def get_log_level(config: Mapping[str, Any]) -> str:
+    if int(config.get('DEBUG', '0')):
+        return 'DEBUG'
+    elif 'LOG_LEVEL' in config:
+        return config['LOG_LEVEL']
+    else:
+        return 'INFO'
+
+
+def configure_logging(app: Flask):
+    logging.basicConfig(
+        level=get_log_level(app.config),
+        format='%(levelname)s:%(threadName)s:%(name)s:%(message)s',
+    )
 
 
 def expand_shortened_path(path: str) -> str:
@@ -49,6 +60,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_prefixed_env('PAPAYA')
     load_config_from_files(app.config)
+    configure_logging(app)
 
     # store the application context in the app config, so the unit tests
     # can easily inject a mock context when needed
@@ -126,75 +138,105 @@ def create_app():
         """Implements the manifest response.
 
         See also: https://iiif.io/api/presentation/2.1/#manifest"""
-        ctx = app.config['papaya_context']
-        return ctx.get_manifest(manifest_id).json(with_context=True)
+        with Timer(
+            name=f'retrieve manifest for {manifest_id}',
+            text='Time to {name}: {milliseconds:.3f} ms',
+            logger=app.logger.info,
+        ):
+            ctx = app.config['papaya_context']
+            return ctx.get_manifest(manifest_id).json(with_context=True)
 
     @app.route('/manifests/<manifest_id>/sequence/<sequence_name>')
     def get_sequence(manifest_id: str, sequence_name: str):
         """Implements the sequence response.
 
         See also: https://iiif.io/api/presentation/2.1/#sequence"""
-        ctx = app.config['papaya_context']
-        try:
-            manifest = ctx.get_manifest(manifest_id)
-            return manifest.find_sequence(sequence_name).json(with_context=True)
-        except KeyError as e:
-            raise SequenceNotFound(sequence_name=sequence_name, manifest_id=manifest_id) from e
+        with Timer(
+            name=f'retrieve sequence {sequence_name} in {manifest_id}',
+            text='Time to {name}: {milliseconds:.3f} ms',
+            logger=app.logger.info,
+        ):
+            ctx = app.config['papaya_context']
+            try:
+                manifest = ctx.get_manifest(manifest_id)
+                return manifest.get_sequence(sequence_name).json(with_context=True)
+            except KeyError as e:
+                raise SequenceNotFound(sequence_name=sequence_name, manifest_id=manifest_id) from e
 
     @app.route('/manifests/<manifest_id>/canvas/<canvas_name>')
     def get_canvas(manifest_id: str, canvas_name: str):
         """Implements the canvas response.
 
         See also: https://iiif.io/api/presentation/2.1/#canvas"""
-        ctx = app.config['papaya_context']
-        try:
-            manifest = ctx.get_manifest(manifest_id)
-            return manifest.find_canvas(canvas_name).json(with_context=True)
-        except KeyError as e:
-            raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
+        with Timer(
+            name=f'retrieve canvas {canvas_name} in {manifest_id}',
+            text='Time to {name}: {milliseconds:.3f} ms',
+            logger=app.logger.info,
+        ):
+            ctx = app.config['papaya_context']
+            try:
+                manifest = ctx.get_manifest(manifest_id)
+                return manifest.find_canvas(canvas_name).json(with_context=True)
+            except KeyError as e:
+                raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
 
     @app.route('/manifests/<manifest_id>/annotation/<annotation_name>')
     def get_annotation(manifest_id: str, annotation_name: str):
         """Implements the image resource response.
 
         See also: https://iiif.io/api/presentation/2.1/#image-resources"""
-        ctx = app.config['papaya_context']
-        try:
-            return ctx.get_manifest(manifest_id).find_annotation(annotation_name).json(with_context=True)
-        except KeyError as e:
-            raise AnnotationNotFound(annotation_name=annotation_name, manifest_id=manifest_id) from e
+        with Timer(
+            name=f'retrieve annotation {annotation_name} in {manifest_id}',
+            text='Time to {name}: {milliseconds:.3f} ms',
+            logger=app.logger.info,
+        ):
+            ctx = app.config['papaya_context']
+            try:
+                return ctx.get_manifest(manifest_id).find_annotation(annotation_name).json(with_context=True)
+            except KeyError as e:
+                raise AnnotationNotFound(annotation_name=annotation_name, manifest_id=manifest_id) from e
 
     @app.route('/manifests/<manifest_id>/manifest/search')
     def get_search(manifest_id: str):
         """Implements the search result annotation list response for a manifest.
 
         See also: https://iiif.io/api/search/1.0/#simple-lists"""
-        ctx = app.config['papaya_context']
-        manifest = ctx.get_manifest(manifest_id)
-        try:
-            results = SearchResultsList(manifest, request.args['q'])
-        except KeyError as e:
-            raise MissingQueryParameter(param_name=e.args[0]) from e
+        with Timer(
+            name=f'search for "{request.args["q"]}" in {manifest_id}',
+            text='Time to {name}: {milliseconds:.3f} ms',
+            logger=app.logger.info,
+        ):
+            ctx = app.config['papaya_context']
+            manifest = ctx.get_manifest(manifest_id)
+            try:
+                results = SearchResultsList(manifest, request.args['q'])
+            except KeyError as e:
+                raise MissingQueryParameter(param_name=e.args[0]) from e
 
-        return results.json(with_context=True)
+            return results.json(with_context=True)
 
     @app.route('/manifests/<manifest_id>/canvas/<canvas_name>/search')
     def get_annotation_list(manifest_id: str, canvas_name: str):
         """Implements the search result annotation list response for a canvas.
 
         See also: https://iiif.io/api/search/1.0/#simple-lists"""
-        ctx = app.config['papaya_context']
-        try:
-            canvas = ctx.get_manifest(manifest_id).find_canvas(canvas_name)
-        except KeyError as e:
-            raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
+        with Timer(
+            name=f'search for "{request.args["q"]}" in canvas {canvas_name} in {manifest_id}',
+            text='Time to {name}: {milliseconds:.3f} ms',
+            logger=app.logger.info,
+        ):
+            ctx = app.config['papaya_context']
+            try:
+                canvas = ctx.get_manifest(manifest_id).find_canvas(canvas_name)
+            except KeyError as e:
+                raise CanvasNotFound(canvas_name=canvas_name, manifest_id=manifest_id) from e
 
-        try:
-            results = SearchResultsList(canvas, request.args['q'])
-        except KeyError as e:
-            raise MissingQueryParameter(param_name=e.args[0]) from e
+            try:
+                results = SearchResultsList(canvas, request.args['q'])
+            except KeyError as e:
+                raise MissingQueryParameter(param_name=e.args[0]) from e
 
-        return results.json(with_context=True)
+            return results.json(with_context=True)
 
     app.register_error_handler(ProblemDetailError, problem_detail_response)
 

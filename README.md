@@ -32,6 +32,10 @@ pipx install papaya-iiif
 ### Environment Variables
 
 * **`PAPAYA_URL`** Public facing base URL of this application.
+* **`PAPAYA_LOG_LEVEL`** Level of log messages to emit. Should be one of
+  `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. Note that setting
+  `FLASK_DEBUG` to a truthy value will override this setting and force the
+  log level to `DEBUG`.
 * **`PAPAYA_FCREPO_ENDPOINT`** URL of the Fedora repository. This is not 
   directly accessed, but is used when translating between URIs and IIIF 
   identifiers.

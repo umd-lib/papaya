@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from waitress import serve
 
 from papaya import __version__
-from papaya.web import create_app
+from papaya.web import create_app, configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +22,12 @@ logger = logging.getLogger(__name__)
 def run(listen):
     load_dotenv()
     server_identity = f'papaya/{__version__}'
+    app = create_app()
+    configure_logging(app)
     logger.info(f'Starting {server_identity}')
     try:
         serve(
-            app=create_app(),
+            app=app,
             listen=listen,
             ident=server_identity,
         )
