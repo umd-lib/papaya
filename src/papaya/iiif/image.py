@@ -4,6 +4,8 @@ from fractions import Fraction
 from typing import NamedTuple
 
 import requests
+from papaya.iiif import DEFAULT_THUMBNAIL_WIDTH, DEFAULT_UNAVAILABLE_IMAGE_ID, IMAGE_API_2_CONTEXT, \
+    IMAGE_API_2_PROFILE_LEVEL_2
 from urlobject import URLObject
 
 logger = logging.getLogger(__name__)
@@ -114,10 +116,17 @@ class ImageResource:
 class ImageService:
     """IIIF Image API service endpoint."""
 
-    def __init__(self, endpoint: str, origin: str | None = None, thumbnail_width: int = 250):
+    def __init__(
+        self,
+        endpoint: str,
+        origin: str | None = None,
+        thumbnail_width: int = DEFAULT_THUMBNAIL_WIDTH,
+        unavailable_image_id: str = DEFAULT_UNAVAILABLE_IMAGE_ID,
+    ):
         self.endpoint = URLObject(endpoint)
         self.origin = URLObject(origin) if origin is not None else None
         self.thumbnail_width = thumbnail_width
+        self.unavailable_image_id = unavailable_image_id
 
     def resource(self, image_id: str) -> ImageResource:
         return ImageResource(endpoint=self.endpoint, origin=self.origin, image_id=image_id)
@@ -138,6 +147,17 @@ class ImageService:
             profile=info['profile'],
             width=info['width'],
             height=info['height'],
+        )
+
+    def get_unavailable_image_placeholder(self) -> ImageInfo:
+        resource = self.resource(self.unavailable_image_id)
+        # TODO: make this more configurable
+        return ImageInfo(
+            uri=resource.uri(),
+            context=IMAGE_API_2_CONTEXT,
+            profile=IMAGE_API_2_PROFILE_LEVEL_2,
+            width=200,
+            height=200,
         )
 
 

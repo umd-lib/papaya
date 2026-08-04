@@ -12,7 +12,7 @@ from papaya import __version__
 from papaya.context import PapayaContext
 from papaya.errors import ProblemDetailError, problem_detail_response, SequenceNotFound, CanvasNotFound, \
     AnnotationNotFound, MissingQueryParameter
-from papaya.iiif import DEFAULT_THUMBNAIL_WIDTH
+from papaya.iiif import DEFAULT_THUMBNAIL_WIDTH, DEFAULT_UNAVAILABLE_IMAGE_ID
 from papaya.iiif.image import ImageService
 from papaya.iiif.search import SearchResultsList
 from papaya.source import RepositoryService, SolrService
@@ -78,6 +78,7 @@ def create_app():
             endpoint=app.config['IIIF_IMAGE_ENDPOINT'],
             origin=app.config.get('IIIF_IMAGE_ORIGIN', None),
             thumbnail_width=app.config.get('THUMBNAIL_WIDTH', DEFAULT_THUMBNAIL_WIDTH),
+            unavailable_image_id=app.config.get('UNAVILABLE_IMAGE_ID', DEFAULT_UNAVAILABLE_IMAGE_ID),
         ),
         endpoint_url=app.config['URL'],
         logo_url=app.config.get('LOGO_URL', None),
