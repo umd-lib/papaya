@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import Any
 
 from papaya.iiif import PRESENTATION_API_2_CONTEXT, SEARCH_API_1_CONTEXT, SEARCH_API_1_PROFILE
-from papaya.iiif.image import ImageParams, ImageInfo, ImageService, FULL_IMAGE_PARAMS
+from papaya.iiif.image import ImageParams, ImageInfo, ImageService, FULL_IMAGE_PARAMS, ImageServiceError
 from papaya.source import Resource, SolrHit
 
 logger = logging.getLogger(__name__)
@@ -243,7 +243,12 @@ class Image:
 
     @cached_property
     def info(self) -> ImageInfo:
-        return self.service.get_metadata(self.image_id)
+        try:
+            return self.service.get_metadata(self.image_id)
+        except ImageServiceError as e:
+            logger.error(f'Unable to retrieve image info for {self.image_id}: {e}')
+            logger.warning(f'Using the placeholder "unavailable" image with ID {self.service.unavailable_image_id}')
+            return self.service.get_unavailable_image_placeholder()
 
     def json(self) -> dict[str, Any]:
         logger.debug(f'Serializing image {self.uri} to JSON')

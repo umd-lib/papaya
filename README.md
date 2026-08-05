@@ -50,7 +50,10 @@ pipx install papaya-iiif
 * **`PAPAYA_IIIF_IMAGE_ORIGIN`** Actual request URL to use for the IIIF 
   Image API server, if it differs from `PAPAYA_IIIF_IMAGE_ENDPOINT`
 * **`PAPAYA_THUMBNAIL_WIDTH`** Maximum width of thumbnail images included 
-  in the manifest.
+  in the manifest. Defaults to 250.
+* **`PAPAYA_UNAVAILABLE_IMAGE_ID`** IIIF identifier of an image to substitute
+  as a placeholder when the application cannot contact the image service.
+  Defaults to "static:unavailable".
 * **`PAPAYA_LOGO_URL`** URL of an image file to be used as the logo in the 
   manifest.
 * **`PAPAYA_METADATA_QUERIES_FILE`** YAML or JSON formatted file that 
@@ -162,6 +165,20 @@ source .venv/bin/activate
 pip install -e . --group test
 ```
 
+### Tests
+
+```zsh
+pytest
+```
+
+With coverage information:
+
+```zsh
+pytest --cov src --cov-report term-missing tests
+```
+
+### Running
+
 Create a `.env` file with the following contents:
 
 ```dotenv
@@ -177,8 +194,6 @@ PAPAYA_LOGO_URL=https://www.lib.umd.edu/images/wrapper/liblogo.png
 PAPAYA_METADATA_QUERIES_FILE=metadata-queries.yml
 ```
 
-### Running
-
 ```zsh
 flask --app papaya.web run
 ```
@@ -189,18 +204,6 @@ To listen on a different port, supply the `--port` option:
 
 ```zsh
 flask --app papaya.web run --port 3001
-```
-
-### Tests
-
-```zsh
-pytest
-```
-
-With coverage information:
-
-```zsh
-pytest --cov src --cov-report term-missing tests
 ```
 
 ### API Documentation
