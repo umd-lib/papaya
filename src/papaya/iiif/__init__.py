@@ -1,5 +1,5 @@
 IMAGE_API_2_CONTEXT = 'http://iiif.io/api/image/2/context.json'
-IMAGE_API_2_PROFILE_LEVEL_2 = 'http://iiif.io/api/image/2/profiles/level2.json'
+IMAGE_API_2_PROFILE_LEVEL_2 = 'http://iiif.io/api/image/2/level2.json'
 
 PRESENTATION_API_2_CONTEXT = 'http://iiif.io/api/presentation/2/context.json'
 
