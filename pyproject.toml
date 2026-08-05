@@ -1,6 +1,6 @@
 [project]
 name = "papaya-iiif"
-version = "1.2.0-rc2"
+version = "1.2.0-rc3"
 description = "IIIF Presentation API implementation"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
