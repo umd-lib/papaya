@@ -1,6 +1,6 @@
 [project]
 name = "papaya-iiif"
-version = "1.1.1"
+version = "1.2.0"
 description = "IIIF Presentation API implementation"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -13,6 +13,7 @@ requires-python = ">= 3.14"
 dependencies = [
     "click",
     "configurenv",
+    "codetiming",
     "flask",
     "jq",
     "pysolr",

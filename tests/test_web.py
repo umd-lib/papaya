@@ -1,9 +1,11 @@
 from http import HTTPStatus
+from unittest.mock import MagicMock
 
 import pytest
 
 from papaya import __version__
-from papaya.web import create_app
+from papaya.iiif.presentation import Manifest
+from papaya.web import create_app, get_log_level
 
 
 @pytest.fixture
@@ -20,6 +22,27 @@ def app(monkeypatch):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.mark.parametrize(
+    ('config', 'expected_level'),
+    [
+        # default level is INFO
+        ({}, 'INFO'),
+        ({'LOG_LEVEL': 'CRITICAL'}, 'CRITICAL'),
+        ({'LOG_LEVEL': 'ERROR'}, 'ERROR'),
+        ({'LOG_LEVEL': 'WARNING'}, 'WARNING'),
+        ({'LOG_LEVEL': 'INFO'}, 'INFO'),
+        ({'LOG_LEVEL': 'DEBUG'}, 'DEBUG'),
+        # `DEBUG` (usually set via `FLASK_DEBUG` in the environment)
+        # overrides the `LOG_LEVEL` config and sets it to DEBUG
+        ({'LOG_LEVEL': 'CRITICAL', 'DEBUG': 1}, 'DEBUG'),
+        ({'DEBUG': 1}, 'DEBUG'),
+        ({'DEBUG': 0}, 'INFO'),
+    ]
+)
+def test_get_log_level(config, expected_level):
+    assert get_log_level(config) == expected_level
 
 
 def test_root(client):
@@ -41,12 +64,6 @@ def test_find_manifest(client):
     assert response.headers['Location'] == '/manifests/fcrepo:123/manifest'
 
 
-def test_find_manifest_with_query(client):
-    response = client.post('/manifests/', data={'uri': 'http://fcrepo-local:8080/fcrepo/rest/123', 'text_query': 'foo'})
-    assert response.status_code == HTTPStatus.FOUND
-    assert response.headers['Location'] == '/manifests/fcrepo:123/manifest?q=foo'
-
-
 @pytest.mark.parametrize(
     ('request_path', 'canonical_url'),
     [
@@ -63,3 +80,16 @@ def test_redirect_to_manifest(client, request_path, canonical_url):
     response = client.get(request_path)
     assert response.status_code == HTTPStatus.MOVED_PERMANENTLY
     assert response.headers['Location'] == canonical_url
+
+
+def test_get_search(app, get_mock_context, get_mock_resource):
+    ctx = get_mock_context(get_mock_resource(searchable=True))
+    mock_manifest = MagicMock(spec=Manifest)
+    mock_manifest.search_text.return_value = []
+    ctx.get_manifest.return_value = mock_manifest
+    app.config['papaya_context'] = ctx
+    client = app.test_client()
+    response = client.get('/manifests/fcrepo:123/manifest/search?q=swordfish')
+    assert response.status_code == HTTPStatus.OK
+    assert response.content_type == 'application/json'
+    assert response.json['@type'] == 'sc:AnnotationList'

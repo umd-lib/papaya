@@ -16,6 +16,8 @@ structure and basic manifest metadata:
 * **`$page_uris`** Returns a list of page URIs in page order
 * **`$page_image_ids`** Returns a list of IIIF Image IDs for the pages,
   in the same order as the `$page_uris`
+* **`$is_searchable` Returns true if the resource described by this
+  manifest has searchable text content (e.g., OCR text)
 
 Metadata queries whose keys begin with `$*` all take arguments at
 runtime:
@@ -69,7 +71,10 @@ Would yield this metadata mapping in the output manifest:
 
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Iterator
+from dataclasses import dataclass
+from functools import cached_property
+from hashlib import sha1
 from typing import NamedTuple, Any
 from urllib.parse import parse_qsl
 from uuid import uuid4
@@ -151,7 +156,7 @@ class URLError(ValueError):
 class Resource:
     """A digital object that has a IIIF manifest."""
 
-    def __init__(self, doc: Mapping[str, Any], metadata_queries: Mapping[str, str] = None):
+    def __init__(self, doc: Mapping[str, Any], metadata_queries: Mapping[str, str] | None = None):
         self.doc = doc
         """Mapping of digital object metadata. Typically a Solr document."""
         self.metadata_queries = metadata_queries or {}
@@ -164,6 +169,7 @@ class Resource:
         }
 
     def _query(self, key: str) -> _ProgramWithInput:
+        logger.debug(f'Running query {key}')
         return self._jq_programs[key].input_value(self.doc)
 
     @property
@@ -179,13 +185,21 @@ class Resource:
         using the string `' / '`."""
         return ' / '.join(self._query('$label'))
 
-    @property
+    @cached_property
     def page_uris(self) -> list[str]:
         """List of URIs of the individual pages of the digital object.
         Metadata query key: `$page_uris`
 
         These should be in the desired presentation order."""
         return self._query('$page_uris').all()
+
+    @cached_property
+    def page_image_ids(self) -> list[str]:
+        """List of IIIF image IDs of the individual pages of the digital
+        object. Metadata query key: `$page_image_ids`
+
+        These should be in the desired presentation order."""
+        return self._query('$page_image_ids').all()
 
     @property
     def date(self) -> str:
@@ -218,6 +232,10 @@ class Resource:
         metadata = [{'label': k, 'value': [format_value(v) for v in self._query(k) if v is not None]} for k in keys]
         return [m for m in metadata if m['value']]
 
+    @property
+    def is_searchable(self) -> bool:
+        return self._query('$is_searchable').first()
+
     def index(self, page_uri: str) -> int:
         """Given a page URI, return the (0-based) index of that page in the
         sequential list of `page_uris`"""
@@ -239,9 +257,8 @@ class Resource:
 
     def get_page_image_id(self, page_uri: str) -> str:
         """Given a page URI, returns the IIIF ID of the image that should be
-        displayed on that page. Metadata query key: `$page_image_ids`. The
-        given `page_uri` is passed to the query as the `$uri` argument."""
-        return self._query('$page_image_ids').all()[self.index(page_uri)]
+        displayed on that page."""
+        return self.page_image_ids[self.index(page_uri)]
 
     def get_page_label(self, page_uri: str) -> str:
         """Given a page URI, returns the value to use as the label for that page.
@@ -286,6 +303,7 @@ class SolrService:
         If no document is found, raises a `SolrDocumentNotFound` exception. If more
         than one document is found, or there is some other error sending the request
         to Solr, raises a `SolrLookupError` exception."""
+        logger.info(f'Sending Solr query for {self.uri_field}={resource_uri}')
         try:
             # use the term query parser and pass the URI as a regular query parameter
             # so that Solr itself will handle the escaping of the URI value
@@ -304,7 +322,7 @@ class SolrService:
         """Get the `Resource` object representing the given `resource_uri`."""
         return Resource(self.get_doc(resource_uri), self.metadata_queries)
 
-    def get_text_matches(self, resource_uri: str, text_query: str, index: int = None) -> list[TaggedText]:
+    def get_text_matches(self, resource_uri: str, text_query: str, index: int | None = None) -> list[SolrHit]:
         """Search the `text_match_field` of the resource with the given `resource_uri`
         for occurrences of `text_query`, using Solr's highlighting capabilities. Returns
         a list of `TaggedText` objects that represent each instance that matched.
@@ -316,14 +334,16 @@ class SolrService:
         match_tag = f'<<{uuid4()}>>'
         try:
             results = self._solr.search(
-                q=f'{{!term f={self.uri_field} v=$id}}',
+                q=text_query,
+                fq=f'{{!term f={self.uri_field} v=$id}}',
                 id=resource_uri,
+                qf=self.text_match_field,
+                defType='edismax',
                 hl='on',
                 **{
                     'hl.fl': self.text_match_field,
-                    'hl.q': f'{self.text_match_field}:{text_query}',
                     'hl.snippets': 100,
-                    'hl.fragsize': 0,
+                    'hl.fragsize': 25,
                     'hl.maxAnalyzedChars': 1_000_000,
                     'hl.tag.pre': match_tag,
                     'hl.tag.post': match_tag,
@@ -333,13 +353,76 @@ class SolrService:
             raise SolrLookupError(str(e)) from e
 
         hits = []
-        for text in results.highlighting[resource_uri].get(self.text_match_field, []):
-            hits.extend(TaggedText.parse(x) for i, x in enumerate(text.split(match_tag)) if i % 2 == 1)
+        for snippet_text in results.highlighting.get(resource_uri, {}).get(self.text_match_field, []):
+            hits.extend(SolrSnippet(snippet_text, match_tag).hits)
 
         if index is not None:
-            return [h for h in hits if int(h.params['n']) == index]
+            return [h for h in hits if int(h.hit.params['n']) == index]
         else:
             return hits
+
+
+@dataclass
+class SolrSnippet:
+    """Represents a single snippet of highlighted text found in the `highlighting`
+    section of a Solr search result. Contains one or more actual search hits."""
+
+    text: str
+    """Raw text returned from the Solr search result"""
+    match_tag: str
+    """The string used for the `hl.tag.pre` and `hl.tag.post` in the search that
+    generated this snippet."""
+
+    @cached_property
+    def slug(self) -> str:
+        """Generate a quasi-unique slug for this snippet by taking the snippet text,
+        stripping out the unique `match_tag`, calculating the SHA1 digest of the text,
+        and truncating to the first 8 characters of the hex representation of the
+        digest."""
+        return sha1(self.text.replace(self.match_tag, '').encode()).hexdigest()[:8]
+
+    @cached_property
+    def hits(self) -> Iterator[SolrHit]:
+        """Returns an iterator over the individual highlighted search hits in this
+        snippet. Each search hit is represented by a `SolrHit` object."""
+
+        pieces = self.text.split(self.match_tag)
+        for n, i in enumerate(range(1, len(pieces), 2), 1):
+            if '|' not in pieces[i]:
+                continue
+            yield SolrHit(
+                id=f'{self.slug}-{n}',
+                tokens_before=[TaggedText.parse(x) for x in pieces[i - 1].split(' ') if '|' in x],
+                match=TaggedText.parse(pieces[i]),
+                tokens_after=[TaggedText.parse(x) for x in pieces[i + 1].split(' ') if '|' in x],
+            )
+
+
+@dataclass
+class SolrHit:
+    """Represents a single search hit (i.e., instance of the query text) along
+    with its context."""
+
+    id: str
+    """Quasi-unique identifier for this Solr search hit"""
+    tokens_before: list[TaggedText]
+    """List of zero or more `TaggedText` tokens that appear before this hit
+    in their parent snippet"""
+    match: TaggedText
+    """The `TaggedText` token of the matching text for this search hit."""
+    tokens_after: list[TaggedText]
+    """List of zero or more `TaggedText` tokens that appear after this hit
+    in their parent snippet"""
+
+    @property
+    def before(self) -> str:
+        """The text portions of the tokens in `tokens_before`, joined with spaces."""
+        return ' '.join(str(x) for x in self.tokens_before)
+
+    @property
+    def after(self) -> str:
+        """The text portions of the tokens in `tokens_after`, joined with spaces."""
+        return ' '.join(str(x) for x in self.tokens_after)
 
 
 class TaggedText(NamedTuple):
@@ -358,3 +441,6 @@ class TaggedText(NamedTuple):
             text=text,
             params=dict(parse_qsl(tag)),
         )
+
+    def __str__(self):
+        return self.text

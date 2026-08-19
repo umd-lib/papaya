@@ -2,11 +2,40 @@
 
 IIIF Presentation API Application
 
+## Description
+
+Papaya is a Python Flask web application that implements the following 
+[IIIF APIs](https://iiif.io/api/):
+
+* [Presentation API 2.1.1](https://iiif.io/api/presentation/2.1/)
+* [Content Search API 1.0.0](https://iiif.io/api/search/1.0/)
+
+## Installation
+
+Requires Python 3.14
+
+Papaya is available [on PyPI](https://pypi.org/project/papaya-iiif/) and 
+can be installed with *pip* or *pipx*:
+
+```zsh
+# recommended if you are planning to reuse parts of Papaya in your own code 
+pip install papaya-iiif
+
+# recommended if you just want to use the "papaya" server application
+pipx install papaya-iiif
+```
+
+(Note that the package name is *papaya-**iiif***, not just *papaya*.)
+
 ## Configuration
 
 ### Environment Variables
 
 * **`PAPAYA_URL`** Public facing base URL of this application.
+* **`PAPAYA_LOG_LEVEL`** Level of log messages to emit. Should be one of
+  `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. Note that setting
+  `FLASK_DEBUG` to a truthy value will override this setting and force the
+  log level to `DEBUG`.
 * **`PAPAYA_FCREPO_ENDPOINT`** URL of the Fedora repository. This is not 
   directly accessed, but is used when translating between URIs and IIIF 
   identifiers.
@@ -21,7 +50,10 @@ IIIF Presentation API Application
 * **`PAPAYA_IIIF_IMAGE_ORIGIN`** Actual request URL to use for the IIIF 
   Image API server, if it differs from `PAPAYA_IIIF_IMAGE_ENDPOINT`
 * **`PAPAYA_THUMBNAIL_WIDTH`** Maximum width of thumbnail images included 
-  in the manifest.
+  in the manifest. Defaults to 250.
+* **`PAPAYA_UNAVAILABLE_IMAGE_ID`** IIIF identifier of an image to substitute
+  as a placeholder when the application cannot contact the image service.
+  Defaults to "static:unavailable".
 * **`PAPAYA_LOGO_URL`** URL of an image file to be used as the logo in the 
   manifest.
 * **`PAPAYA_METADATA_QUERIES_FILE`** YAML or JSON formatted file that 
@@ -51,6 +83,7 @@ IIIF Presentation API Application
     $license_uri: .object__rights__same_as__uris[0]
     $page_uris: .page_uri_sequence__uris[]?
     $page_image_ids: .iiif_thumbnail_sequence__ids[]?
+    $is_searchable: has("extracted_text__dps_txt")
     $*page_doc: .object__has_member[]|select(.id == $uri)
     $*page_label: .object__has_member[]|select(.id == $uri).page__title__txt
     $*file_page_uri: .object__has_member[]|select(.page__has_file[].id == $uri).id
@@ -79,7 +112,7 @@ requests that reflect the canonical URI.
 For example, given:
 
 * `PAPAYA_IIIF_IMAGE_ENDPOINT` is `https://iiif.example.com/images/iiif/2`
-* `PAPAYA_IIIF_IMAGE_ORIGIN` is `http://papaya:3001/iiif/2`
+* `PAPAYA_IIIF_IMAGE_ORIGIN` is `http://image-service:8182/iiif/2`
 
 The headers would be:
 
@@ -90,6 +123,28 @@ The headers would be:
 The `X-Forwarded-Path` is calculated by removing the path of the origin 
 URL (e.g., `/iiif/2`) from the end of the path of the endpoint URI (e.g., 
 `/images/iiif/2`).
+
+## Running
+
+```zsh
+papaya
+```
+
+Papaya listens on port 5000 by default: <http://localhost:5000/>
+
+To change, you can specify a different port:
+
+```zsh
+papaya --listen :3002
+```
+
+Then it will be listening at <http://localhost:3002/>
+
+To see all options:
+
+```zsh
+papaya --help
+```
 
 ## Development Setup
 
@@ -110,6 +165,20 @@ source .venv/bin/activate
 pip install -e . --group test
 ```
 
+### Tests
+
+```zsh
+pytest
+```
+
+With coverage information:
+
+```zsh
+pytest --cov src --cov-report term-missing tests
+```
+
+### Running
+
 Create a `.env` file with the following contents:
 
 ```dotenv
@@ -125,8 +194,6 @@ PAPAYA_LOGO_URL=https://www.lib.umd.edu/images/wrapper/liblogo.png
 PAPAYA_METADATA_QUERIES_FILE=metadata-queries.yml
 ```
 
-### Running
-
 ```zsh
 flask --app papaya.web run
 ```
@@ -137,18 +204,6 @@ To listen on a different port, supply the `--port` option:
 
 ```zsh
 flask --app papaya.web run --port 3001
-```
-
-### Tests
-
-```zsh
-pytest
-```
-
-With coverage information:
-
-```zsh
-pytest --cov src --cov-report term-missing tests
 ```
 
 ### API Documentation
@@ -178,7 +233,7 @@ docker build -t docker.lib.umd.edu/papaya .
 ```
 
 When running in a Docker container, the `PAPAYA_SOLR_ENDPOINT` and
-`PAPAYA_IIIF_IMAGE_ENDPOINT` environment variables will need to be
+`PAPAYA_IIIF_IMAGE_ORIGIN` environment variables will need to be
 adjusted to refer to the correct hostname.
 
 Copy the `.env` file set up earlier to `docker.env`, and make these
@@ -186,7 +241,7 @@ changes:
 
 ```dotenv
 PAPAYA_SOLR_ENDPOINT=http://host.docker.internal:8985/solr/fcrepo
-PAPAYA_IIIF_IMAGE_ENDPOINT=http://host.docker.internal:8182/iiif/2
+PAPAYA_IIIF_IMAGE_ORIGIN=http://host.docker.internal:8182/iiif/2
 ```
 
 Run, using this new `docker.env` file:
