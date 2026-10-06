@@ -33,7 +33,7 @@ def test_image_params_to_string():
         ('foo', 'application/octet-stream'),
     ]
 )
-def test_image_params_to_string(image_format, expected_mime_type):
+def test_image_params_to_mime_type(image_format, expected_mime_type):
     params = ImageParams(
         region='full',
         size='100,100',

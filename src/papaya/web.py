@@ -7,6 +7,7 @@ from typing import Any
 from codetiming import Timer
 from configurenv import load_config_from_files
 from flask import Flask, url_for, redirect, request
+from flask_cors import CORS
 
 from papaya import __version__
 from papaya.context import PapayaContext
@@ -61,6 +62,7 @@ def create_app():
     app.config.from_prefixed_env('PAPAYA')
     load_config_from_files(app.config)
     configure_logging(app)
+    CORS(app)
 
     # store the application context in the app config, so the unit tests
     # can easily inject a mock context when needed

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "papaya-iiif"
 version = "1.2.0"
@@ -22,15 +26,14 @@ dependencies = [
     "requests",
     "urlobject",
     "waitress",
+    "flask-cors>=6.0.5",
 ]
 
 [dependency-groups]
-test = [
+dev = [
     "pytest",
     "pytest-cov",
     "ruff",
-]
-docs = [
     "pdoc",
 ]
 
